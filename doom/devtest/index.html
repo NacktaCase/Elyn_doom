@@ -1,0 +1,98 @@
+<!doctype html><meta charset="utf-8"><title>DOOM devtest</title>
+<style>body{background:#15181d;color:#c8d0dc;font:12px ui-monospace,monospace;padding:12px}
+canvas{image-rendering:pixelated;background:#000;display:block;margin:8px 0}
+pre{background:#0e1013;padding:8px;white-space:pre-wrap;max-height:40vh;overflow:auto}
+#err{color:#bf616a;font-weight:700}</style>
+<div id="st">시작…</div><canvas id="cv" width="640" height="400"></canvas>
+<div id="err"></div><pre id="log"></pre>
+<script src="/wasi-shim.js"></script>
+<script src="/audio.js"></script>
+<script>
+// DoomGame.jsx 의 3절과 **같은 순서**로 부른다. 다르면 재현이 의미가 없다.
+const log=[],E=document.getElementById('log'),S=document.getElementById('st'),ER=document.getElementById('err');
+const say=l=>{log.push(l);E.textContent=log.join('\n');};
+const t0=performance.now(); const nowMs=()=>performance.now()-t0;
+let memory=null, shim=null, audio=null, sndCount=0;
+const boom=(where,e)=>{
+  if(shim&&shim._flush)try{shim._flush()}catch(_){}
+  ER.textContent=where+' → '+(e&&e.message?e.message:e);
+  say('');say('=== '+where+' ===');
+  if(e&&e.stack)say(e.stack);
+  console.error(where,e);
+};
+(async()=>{
+ try{
+  const [wasm,wad]=await Promise.all([
+    fetch('/doom.wasm').then(r=>r.arrayBuffer()),
+    fetch('/doom.wad').then(r=>r.arrayBuffer())]);
+  S.textContent='wasm '+(wasm.byteLength/1024|0)+'KB · wad '+(wad.byteLength/1024|0)+'KB';
+  shim=createWasiShim(()=>memory,{nowMs,onOut:say});
+  audio=createDoomAudio(()=>memory,{onNote:s=>say('[audio] '+s)});
+  window.__audio=audio;
+  // 실제로 재생 요청이 오는지 세어 본다 (소리는 못 듣지만 경로는 확인된다)
+  // ⚠ 계측은 **인스턴스화 전에** 끼워야 한다. wasm 은 인스턴스화 시점의
+  //   함수 객체를 붙들고 있어서, 나중에 프로퍼티를 갈아끼워도 소용없다.
+  window.__sndLog=[];
+  const rawStart=audio.imports.js_snd_start;
+  audio.imports.js_snd_start=function(p,l,c,v,s){
+    sndCount++; window.__snd=sndCount;
+    if(window.__sndLog.length<8){
+      const m=new Uint8Array(memory.buffer);
+      const cnt=m[p+4]|(m[p+5]<<8)|(m[p+6]<<16)|(m[p+7]<<24);
+      let mn=255,mx=0;
+      for(let i=0;i<Math.min(3000,cnt-32);i++){const q=m[p+16+i];if(q<mn)mn=q;if(q>mx)mx=q;}
+      window.__sndLog.push({rate:m[p+2]|(m[p+3]<<8),cnt:cnt,len:l,vol:v,sep:s,
+                            진폭:mx-mn,유효:cnt<=l-8&&cnt>48});
+    }
+    return rawStart(p,l,c,v,s);
+  };
+  const {instance}=await WebAssembly.instantiate(wasm,{
+    wasi_snapshot_preview1:shim, env:Object.assign({js_now_ms:()=>nowMs()>>>0}, audio.imports)});
+  const x=instance.exports; memory=x.memory;
+  window.__doom=x; window.__boom=boom;   // 콘솔에서 키를 직접 넣기 위해
+  audio.setEngine(x);
+  // 음악이 실제로 만들어지는지 계측한다 (소리는 못 듣지만 샘플은 볼 수 있다)
+  window.__musicPeek=(n)=>{const p=x.doom_music_fill(n||1024);if(!p)return null;
+    const a=new Int16Array(x.memory.buffer,p,(n||1024)*2);let mn=0,mx=0,nz=0;
+    for(let i=0;i<a.length;i++){const v=a[i];if(v)nz++;if(v<mn)mn=v;if(v>mx)mx=v;}
+    return {비영샘플:nz,최소:mn,최대:mx,진폭:mx-mn};};
+  if(x._initialize)x._initialize();
+  const bytes=new Uint8Array(wad);
+  const ptr=x.doom_wad_alloc(bytes.length);
+  new Uint8Array(x.memory.buffer).set(bytes,ptr);
+  S.textContent='doom_init…';
+  try{ x.doom_init(); }catch(e){ boom('doom_init',e); return; }
+  S.textContent='부팅 성공 '+x.doom_width()+'x'+x.doom_height();
+  const W=x.doom_width(),H=x.doom_height();
+  const ctx=document.getElementById('cv').getContext('2d');
+  const img=new ImageData(W,H), dst=new Uint32Array(img.data.buffer);
+  let n=0;
+  // DOOM 은 35Hz. rAF 마다 부르면 TryRunTics 의 바쁜 대기로 CPU 를 태운다.
+  const TIC=1000/35; let nextTic=performance.now();
+  const tick=()=>{
+    const now=performance.now();
+    if(now<nextTic){ requestAnimationFrame(tick); return; }
+    nextTic+=TIC; if(now-nextTic>250) nextTic=now+TIC;
+    try{
+      x.doom_tick();
+      if(x.doom_exited && x.doom_exited()){ S.textContent='종료됨 (틱 '+n+')'; window.__exited=1; return; }
+      const src=new Uint32Array(x.memory.buffer,x.doom_frame_ptr(),W*H);
+      for(let i=0;i<W*H;i++){const v=src[i];
+        dst[i]=(0xff000000|((v&255)<<16)|(v&0xff00)|((v>>16)&255))>>>0;}
+      ctx.putImageData(img,0,0);
+    }catch(e){
+      if(e&&e.doomExit===0){ S.textContent='정상 종료 (틱 '+n+')'; window.__exited=1; return; }
+      boom('doom_tick #'+n,e); return; }
+    if(++n%60===0)S.textContent='틱 '+n;
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+  const K={ArrowRight:0xae,ArrowLeft:0xac,ArrowUp:0xad,ArrowDown:0xaf,
+    KeyW:0xad,KeyS:0xaf,KeyA:0xa0,KeyD:0xa1,Space:0xa2,
+    ControlLeft:0xa3,ControlRight:0xa3,ShiftLeft:0xb6,Escape:27,Enter:13,
+    Digit1:49,Digit2:50,Digit3:51,Digit4:52,Digit5:53,Digit6:54,Digit7:55};
+  addEventListener('keydown',e=>{if(K[e.code]){e.preventDefault();x.doom_key(1,K[e.code]);}});
+  addEventListener('keyup',e=>{if(K[e.code])x.doom_key(0,K[e.code]);});
+ }catch(e){ boom('부팅', e); }
+})();
+</script>
