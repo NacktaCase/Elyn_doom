@@ -1,0 +1,49 @@
+이 폴더의 FreedoomGame.jsx · FreedoomWad1.jsx‥FreedoomWad5.jsx 는
+Freedoom Phase 1 (https://freedoom.github.io/, 0.13.0) 의 게임 데이터를
+gzip 압축 후 base64 로 실어 나른다. 에피소드 1(E1M1‥E1M9)이 참조하는
+에셋만 남기도록 프루닝했고, 어트랙트 루프 데모 4개 중 에피소드 1 밖을
+가리키던 것은 싣는 맵을 가리키도록 바꿔치웠다 — 원본 그대로가 아니라
+수정된 배포물이다. 자세한 내용은 저장소 루트의 README.md "Freedoom 판"
+절을 보라.
+
+Freedoom 은 아래 BSD-3-Clause 로 배포되고, 수정·재배포판에도 같은 고지가
+따라와야 한다. 원문은 https://github.com/freedoom/freedoom/blob/master/COPYING.adoc
+이고, 기여자 명단은 https://github.com/freedoom/freedoom/blob/master/CREDITS 다.
+
+────────────────────────────────────────────────────────────────────
+
+Copyright © 2001-2024
+Contributors to the Freedoom project.  All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+  * Redistributions of source code must retain the above copyright
+    notice, this list of conditions and the following disclaimer.
+  * Redistributions in binary form must reproduce the above copyright
+    notice, this list of conditions and the following disclaimer in the
+    documentation and/or other materials provided with the distribution.
+  * Neither the name of the Freedoom project nor the names of its
+    contributors may be used to endorse or promote products derived from
+    this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED
+TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A
+PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER
+OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+For a list of contributors to the Freedoom project, see the file
+CREDITS at the URL above.
+
+────────────────────────────────────────────────────────────────────
+
+이 저장소 자체의 코드(빌드 도구·컴포넌트 본체)는 GPL-2.0 이다 — 별개의
+라이선스이니 혼동하지 말 것. 자세한 내용은 저장소 루트의 LICENSE 를 보라.

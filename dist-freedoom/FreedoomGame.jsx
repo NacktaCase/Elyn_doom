@@ -1,60 +1,5 @@
-function DoomGame(props) {
-  // ═══════════════════════════════════════════════════════════
-  // DOOM — Elyn 샌드박스에서 도는 진짜 DOOM.
-  //
-  //   <DoomGame />
-  //
-  // WAD 는 **셰어웨어 doom1.wad v1.9 를 변형 없이 통째로** 싣는다
-  // (md5 f0cefca49926d00903cf57551d901abe). 셰어웨어 라이선스가 "완전하고
-  // 변형되지 않은" 재배포만 허용하기 때문이고, tools/build-wad.cjs 가
-  // 그 해시를 보고 프루닝을 아예 막는다.
-  // 그래서 E1M1~E1M9 아홉 판이 원곡·전체 효과음과 함께 들어 있다.
-  //
-  // ⚠ 셰어웨어에는 플라즈마건·BFG·슈퍼샷건 그래픽이 **원래 없다.** 정상
-  //   플레이로는 얻을 수 없으니 상관없지만, IDKFA 치트로 억지로 쥐면
-  //   R_DrawPSprite 가 RANGECHECK 로 죽는다(doomgeneric 은 바닐라와 달리
-  //   RANGECHECK 가 켜져 있다). IWAD 를 못 고치므로 남겨둔 한계다.
-  //
-  // ⚠ **바로 게임에 들어가게 만들지 말 것.** 타이틀 → 데모 → 메뉴가 원래
-  //   흐름이고, 타이틀 배너에 "PROVIDED BY id FREE OF CHARGE · SUGGESTED
-  //   RETAIL PRICE $9.00" 이라는 셰어웨어 고지가 실려 있다. 한때 -warp 로
-  //   건너뛰었는데, 그건 셰어웨어 배포가 존재하는 이유 자체를 가리는 것이다.
-  //   (doom/src/doomgeneric_wasm.c 의 doom_init 참조)
-  //
-  // 엔진은 doomgeneric(= chocolate-doom 이식)을 wasi-sdk clang 으로 wasm32 로
-  // 빌드한 것이다. Emscripten 을 안 쓴다. 이유가 둘인데 두 번째가 결정적이다:
-  //   1. Elyn 컴포넌트는 function 하나에 다 들어가야 해서 glue 모듈을 import
-  //      할 수 없다 (ChessEngine.jsx 가 같은 이유로 날것 export 를 쓴다).
-  //   2. **Elyn 은 소스를 정적 스캔해 등록을 막는다.** 정찰본 v1.0 이 실제로
-  //      거부됐다. Emscripten glue 에는 네트워크·URL·파일 계열 이름이 수십 개
-  //      박혀 있어 그대로는 등록조차 안 될 공산이 크다. glue 가 없으면 걸릴
-  //      이름이 애초에 안 생긴다.
-  //
-  // ── 함께 등록해야 하는 컴포넌트 ────────────────────────────
-  //   DoomWad1 · DoomWad2   WAD 를 나눠 담은 헤드리스 데이터 운반체.
-  // 레지스트리가 평면 전역이라 셋 다 각각 등록해야 하고, 하나라도 빠지면
-  // 아래 정보 줄에 드러난다.
-  //
-  // WAD 를 쪼개는 이유는 페이로드가 아니라 **에디터**다. 총량은 리비전
-  // 단위라 나눠도 같지만, 한 파일이 커지면 CodeMirror 가 붙여넣기 중에
-  // 터지면서 **붙여넣은 것과 저장된 것이 달라진다.** ChessPieces.jsx 가
-  // 693 KB 로 도는 것은 확인됐으므로 그 근처로 끊는다.
-  //
-  // ── 실측으로 정해진 것들 (SandboxProbe v1.1) ───────────────
-  //   · 키는 React 합성 이벤트로만 온다. window 가 없다.
-  //     → **캔버스가 포커스를 쥔 동안만** 조작된다. 그래서 "클릭해서 시작"이다.
-  //   · e.code 가 165/165 로 전부 온다 → 스캔코드 기반이라 한글 입력
-  //     상태에서도 WASD 가 물리 위치로 동작한다.
-  //   · preventDefault 가 먹는다 → 방향키·스페이스가 채팅창을 안 뺏는다.
-  //   · DecompressionStream 이 gzip 을 푼다 → WAD·wasm 을 압축해 싣는다.
-  //   · WebAssembly.Memory 16MB 확보 + 32MB grow 성공.
-  // ═══════════════════════════════════════════════════════════
+function FreedoomGame(props) {
   const DOOM_BUILD = '2.7';
-
-  // <<WASM-DATA>>
-  // 생성물이다 — 손으로 고치지 말 것. `node tools/build-doom-jsx.cjs`.
-  // doomgeneric, wasi-sdk clang -Oz. Emscripten glue 없음.
-  //   원본 432706B → gzip 176437B (41%)
   const WASM_GZ_B64 = [
     "H4sIAAAAAAACCsS9DZRU1Zkoun/OqaruU9UcDckwaSfuqnhnOuuJel9myhmdH7Y3/GpM3lpz1503a9ZFI2S0uhEaWpOZGLrARkkk2hqSECXaGozEoKCiohJslWirRFpFRQVtBZUoE0lCEmJQnt/P3mdXdbcxd967z4Tqc/bZ//vb3/729yvOXjRPCiHkPlk+S4izVG+vOEv39vbK3rNkrzhLwkPUSwlC9kIG2XuW7l3cKxefFcMHLiAoEXIvxjwt+HExveTwBZ5i95CnpF7hPgpqiP4sxrYXQ6VfFWfpxZAuvyrOKgSVqot65UVnKciLReTis9RFF8mLaAAXuaYuwk5DbxcvXrxYqN/FH9Nzz7+wpbZo9vnzvzR73iKRg/dibdHsRefPmb2o5+yFPaIFkhKfNH+B0JDSxikLus7+t/PO/1cRQWKJEy9YMOfsnrmi9WNfOnvRebMXnX/2gkXnzu+ZvWDh3AvPm/ul/5rMPf/C8xbOP3/2",
     "v87tEflxMh3lMi0679/nLvrArG3ndM0/p3N2z3nz5mK+ZJx8hS/OmX1O1/xFc0U0To7SF+fM/uKcRT1n93xggx/Jsi2a2zP7i11n/+ui8Xv3xTnw/KEqdfnmnLdw9vlnz5sr1DiZ81+cM3vh3LPniPgDMiyaO7dTFD9gMr608LyeueNW8dEFZ/ecO/uchXPP7pkLPZp7Ts/8hf82bpdaMPv8BXPPF6UPrHHh3HnzL/wwNSacHWeibZxMKWa64Pyu887vnP3F87rmfkAHF84/Z/bcL5/XI7Q+nH8nLyaIpv8iIUReSi1aUyGFFjoXiXyUj/IilxMyEiKnIVsuLBIJIfFXCC1ahWhV+F8ct0kRCU25tNb51pym4lq2aqF1Sz6SOtWtWh+ldV5TTp2LtBCyNZLQulC5nNYiH+fiVq3yUSR0a15KIWSU19xkPq81VAc/gp/g5Wj3LqC5COrX1E8dqSivVF7m4ziXE9h4pFVeaillFEURJIz+",
@@ -528,13 +473,6 @@ function DoomGame(props) {
     "804v6WAlU78Gw6PBgRTc9/Ru206flwuvsSd8myah/9Y31B9b15ZM+oTiz+NJ5W8o/jweSqp/O7ilPwX3WweCg+EU6pdwH02hv7otPDoc2ZlC+kSiw30pPJ9uiUR7tm9JyX00Rfux/ErSfUrt/2BwKKX+xmBwKLX7UTy6SbqPt7fJuO8Ph4dUAiXrPjSaUn8p1l4l27/qS9F+Kuk/Egz1RZKs732hwe1Rw9yF3zBv1BcKnRby0AGtTv/WYMo6RpUJ6/fiOuJpZjgyrAlgtlGnZ6BvWM8y9jP/1hfaEu6NDIR2aFjWfnSiB6DTdwA6IwegEzwAnYED0NGxTHM+9UaGh8Mj0dTyNrzDnLf68j24eziirxUBgz90neSPA/HvJoi/t3/B5pDkfOjvE77Dsv9D6d0v16emqjesvt2Xot5q9c3UFPVOIONLqegtl+teU9Ubl/ufp6p3PnlnPRW9jgPUW06+o7C/w5J6ogSNqe8rHqCedYB69gHq",
     "+Q5Qz3+AehkHqBdIQU+Vs0uT3CdB519q+yvE/RVtxbcOQK/yAOv9NQdYf3vJd9pT0dtF+uvJHJkkfskeGK8/y8U94yx21Iygs/ea5czLRAbh0L6dwZBzulCcDDxiw2mP2LDzEbdW3EzeG7DlX+MtbhdF7I0k7KGUib/nDA3bklzzfUWEhtaJOzTu1PsDzy3MnFD+TM+FqRzvyfjuLxx3ynC8JsLhS0z3ZO7X+zvGHrXh/wEwFh1NQpoGAA==",
   ].join('');
-  // <</WASM-DATA>>
-
-  // ───────────────────────────────────────────────────────────
-  // 1. 유틸 — ChessEngine.jsx 에서 검증된 것을 그대로 가져온다.
-  // ───────────────────────────────────────────────────────────
-
-  // ChessEngine.jsx:1560 그대로. atob 능력 탐지 + 수동 폴백.
   const b64Bytes = (str) => {
     if (typeof atob === 'function') {
       const bin = atob(str);
@@ -556,13 +494,6 @@ function DoomGame(props) {
     }
     return out;
   };
-
-  // gzip 해제. 정찰에서 ReadableStream → pipeThrough → Response 경로가
-  // 도는 것을 확인했다.
-  //
-  // ⚠ 이진 덩어리 객체(B로 시작하는 그것)로 입력 스트림을 만들지 말 것.
-  //   Elyn 의 정적 스캐너가 그 이름 때문에 컴포넌트를 통째로 막는다.
-  //   ReadableStream 으로 같은 일이 되므로 그 이름을 아예 부르지 않는다.
   const gunzip = (bytes) => {
     if (typeof DecompressionStream !== 'function'
       || typeof ReadableStream !== 'function'
@@ -573,12 +504,6 @@ function DoomGame(props) {
     return new Response(src.pipeThrough(new DecompressionStream('gzip')))
       .arrayBuffer().then((ab) => new Uint8Array(ab));
   };
-
-  // 시계. **스스로 흘러야 한다.**
-  // ⚠ 이게 얼면 DOOM 이 통째로 멈춘다. TryRunTics 는
-  //   `I_GetTime() - entertime > 10` 으로만 빠져나오는데(d_loop.c) 우리 쪽
-  //   I_Sleep 이 no-op 이라, 시계가 안 흐르면 영원히 돈다.
-  //   Node 검증에서 가짜 시계를 줬다가 실제로 무한 루프에 빠졌다.
   const pickClock = () => {
     if (typeof performance !== 'undefined' && performance
       && typeof performance.now === 'function') {
@@ -588,39 +513,21 @@ function DoomGame(props) {
     const d0 = Date.now();
     return () => Date.now() - d0;
   };
-
-  // ───────────────────────────────────────────────────────────
-  // 2. 키 변환표 — 브라우저 e.code → DOOM 키코드 (doomkeys.h)
-  //    C 가 아니라 여기 두는 이유: 자판·브라우저·모바일을 겪으며 계속
-  //    고쳐질 물건인데, C 에 있으면 고칠 때마다 wasm 을 다시 빌드해
-  //    base64 를 다시 주입해야 한다. 여기 있으면 이 파일만 고치면 된다.
-  // ───────────────────────────────────────────────────────────
   const KEY = {
-    // ⚠ **Ctrl 을 쓰지 않는다.** DOOM 기본은 Ctrl=발사인데, 전진이 W 라
-    //   "쏘면서 전진"이 Ctrl+W = **브라우저 탭 닫기**가 된다.
-    //   Ctrl+W · Ctrl+T · Ctrl+N · Ctrl+R 은 브라우저가 예약한 단축키라
-    //   preventDefault 로 **막을 수 없다**(보안상 가로채기 금지).
-    //   실기에서 그대로 당했다 — 게임 중 페이지가 그냥 닫혔다.
-    //   Alt 도 뺀다: Alt 단독으로 브라우저 메뉴 표시줄이 잡히고
-    //   Alt+F 같은 조합도 브라우저가 가져간다. 스트레이프는 A/D 로 충분하다.
-    //
-    //   그래서 웹 이식판의 관례를 따른다: **Space=발사, E=사용.**
     ArrowRight: 0xae, ArrowLeft: 0xac, ArrowUp: 0xad, ArrowDown: 0xaf,
-    KeyW: 0xad, KeyS: 0xaf,            // 전진/후진
-    KeyA: 0xa0, KeyD: 0xa1,            // 좌/우 스트레이프
+    KeyW: 0xad, KeyS: 0xaf,
+    KeyA: 0xa0, KeyD: 0xa1,
     Comma: 0xa0, Period: 0xa1,
-    Space: 0xa3,                       // 발사
-    ShiftLeft: 0x80 + 0x36, ShiftRight: 0x80 + 0x36,   // 달리기
+    Space: 0xa3,
+    ShiftLeft: 0x80 + 0x36, ShiftRight: 0x80 + 0x36,
     Escape: 27, Enter: 13, NumpadEnter: 13, Tab: 9, Backspace: 0x7f,
     Equal: 0x3d, Minus: 0x2d, Pause: 0xff,
     Digit1: 49, Digit2: 50, Digit3: 51, Digit4: 52,
-    Digit5: 53, Digit6: 54, Digit7: 55,                // 무기 선택
+    Digit5: 53, Digit6: 54, Digit7: 55,
     F1: 0x80 + 0x3b, F2: 0x80 + 0x3c, F3: 0x80 + 0x3d, F4: 0x80 + 0x3e,
     F5: 0x80 + 0x3f, F6: 0x80 + 0x40, F7: 0x80 + 0x41, F8: 0x80 + 0x42,
     F9: 0x80 + 0x43, F10: 0x80 + 0x44, F11: 0x80 + 0x57, F12: 0x80 + 0x58,
   };
-  // e.code 가 없는 환경(모바일 IME 등)을 위한 폴백. 정찰에서는 165/165 로
-  // 전부 왔지만 없다고 가정하지 않을 이유가 없다.
   const KEY_BY_KEY = {
     ArrowRight: 0xae, ArrowLeft: 0xac, ArrowUp: 0xad, ArrowDown: 0xaf,
     ' ': 0xa3, Shift: 0x80 + 0x36,
@@ -634,75 +541,45 @@ function DoomGame(props) {
     }
     return 0;
   };
-
-  // <<AUDIO>>
-  // 생성물이다 — 원본은 doom/src/audio.js 다. 손으로 고치지 말 것.
   const createDoomAudio = function (getMemory, opts) {
     var options = opts || {};
     var onNote = options.onNote || function () {};
-
     var ctx = null;
     var master = null;
-    var engine = null;         // wasm exports (음악을 당겨오려면 필요하다)
+    var engine = null;
     var musicNode = null;
-    var OPL_RATE = 44100;      // opl_wasm.c 의 기본 샘플레이트
-    var resamplePhase = 0;     // 리샘플 위상. 블록 사이에 이어져야 한다.
-    var state = "idle";        // idle → on | muted | unavailable | failed
-    var VOLUME = 0.6;          // DOOM 효과음은 원래 크다
-    var buffers = {};          // 럼프 주소 → AudioBuffer
-    var channels = {};         // 채널 번호 → { src, gain, pan, endsAt }
-
+    var OPL_RATE = 44100;
+    var resamplePhase = 0;
+    var state = "idle";
+    var VOLUME = 0.6;
+    var buffers = {};
+    var channels = {};
     var hasAudio = function () {
       try {
         return typeof AudioContext !== "undefined" || typeof webkitAudioContext !== "undefined";
       } catch (e) { return false; }
     };
-
-    // ── DOOM sfx 럼프 → AudioBuffer ──────────────────────────────────
-    // 포맷: format(2) samplerate(2) length(4) 그다음 8비트 unsigned PCM.
-    //
-    // ⚠ 앞뒤 16바이트는 건너뛴다. DMX 사운드 라이브러리가 그렇게 했고
-    //   chocolate-doom 의 ExpandSoundData 도 `data += 16; length -= 32;` 로
-    //   따라간다. 안 건너뛰면 소리 앞뒤에 딱 소리가 붙는다.
     var decode = function (ptr, len) {
       if (buffers[ptr]) return buffers[ptr];
       var m = new Uint8Array(getMemory().buffer);
       if (len < 8) return null;
-
       var rate = m[ptr + 2] | (m[ptr + 3] << 8);
       var count = m[ptr + 4] | (m[ptr + 5] << 8) | (m[ptr + 6] << 16) | (m[ptr + 7] << 24);
-      // 헤더가 럼프보다 길다고 하면 깨진 럼프다. 조용히 포기한다.
       if (count > len - 8 || count <= 48) return null;
       if (!(rate > 0)) rate = 11025;
-
       var start = ptr + 16;
       var n = count - 32;
       if (n <= 0) return null;
-
       var buf;
       try { buf = ctx.createBuffer(1, n, rate); }
       catch (e) {
-        // 일부 브라우저는 22050 미만 샘플레이트로 만든 버퍼를 거부한다.
-        // 그때는 컨텍스트 기본 레이트로 만들고 재생 속도로 보정한다.
         try { buf = ctx.createBuffer(1, n, ctx.sampleRate); } catch (e2) { return null; }
       }
       var ch = buf.getChannelData(0);
       for (var i = 0; i < n; i++) ch[i] = (m[start + i] - 128) / 128;
-
       buffers[ptr] = { buf: buf, rate: rate };
       return buffers[ptr];
     };
-
-    // ── 음악 ─────────────────────────────────────────────────────────
-    // 효과음은 "한 방 쏘고 끝"이지만 음악은 **계속 당겨가야** 한다.
-    // AudioWorklet 은 모듈을 URL 로 불러와야 하는데, 그 URL 을 만드는 흔한
-    // 방법(이진 덩어리 객체 + 오브젝트 URL)이 Elyn 정적 스캐너에 막힌다.
-    // 그래서 URL 이 필요 없는 ScriptProcessorNode 를 쓴다. 구식이지만
-    // 어디서나 돌고, 측정해 보니 메인스레드의 2% 밖에 안 쓴다.
-    //
-    // ⚠ 그 API 이름들을 **주석에도 적지 말 것.** 업로드본은 주석을 남기고
-    //   뽑으므로 스캐너에는 코드와 똑같이 보인다. 여기서 한 번 어겼다가
-    //   자체검증 B절에 잡혔다.
     var startMusic = function () {
       if (musicNode || !ctx || !engine || typeof engine.doom_music_fill !== "function") return;
       try {
@@ -713,13 +590,9 @@ function DoomGame(props) {
           var need = L.length;
           try {
             var ratio = OPL_RATE / ctx.sampleRate;
-
-            // 레이트가 같으면(요청이 받아들여진 보통의 경우) 그대로 옮긴다.
-            // 보간이 없으니 OPL 이 만든 파형 그대로다.
             if (ratio === 1) {
               var p1 = engine.doom_music_fill(need);
               if (!p1) { L.fill(0); R.fill(0); return; }
-              // ⚠ 뷰는 **매번** 새로 잡는다. 메모리가 grow 하면 갈아치워진다.
               var d1 = new Int16Array(getMemory().buffer, p1, need * 2);
               for (var j = 0; j < need; j++) {
                 L[j] = d1[j * 2] / 32768;
@@ -727,10 +600,6 @@ function DoomGame(props) {
               }
               return;
             }
-
-            // 브라우저가 레이트 요청을 무시했을 때만 리샘플한다.
-            // 위상을 블록 사이에 **이어간다** — 매번 0 으로 되돌리면 블록
-            // 경계(약 43ms)마다 미세한 이음매가 들린다.
             var srcFrames = Math.ceil((need * ratio) + resamplePhase) + 2;
             var ptr = engine.doom_music_fill(srcFrames);
             if (!ptr) { L.fill(0); R.fill(0); return; }
@@ -752,26 +621,19 @@ function DoomGame(props) {
         musicNode.connect(master);
       } catch (e) { musicNode = null; }
     };
-
     var stop = function (channel) {
       var c = channels[channel];
       if (!c) return;
-      try { c.src.stop(); } catch (e) { /* 이미 끝났다 */ }
+      try { c.src.stop(); } catch (e) {  }
       delete channels[channel];
     };
-
     return {
-      // 사용자 제스처 안에서 부른다. 두 번 이상 불러도 안전하다.
       resume: function () {
         if (state === "unavailable" || state === "failed") return state;
         if (!ctx) {
           if (!hasAudio()) { state = "unavailable"; onNote(state); return state; }
           try {
             var C = (typeof AudioContext !== "undefined") ? AudioContext : webkitAudioContext;
-            // ⚠ **OPL 과 같은 레이트를 요청한다.** 다르면 JS 가 리샘플해야 하는데,
-            //   ScriptProcessor 블록마다 보간 위상이 0 으로 되돌아가 43ms 주기의
-            //   미세한 이음매가 생긴다. 레이트를 맞추면 그 경로 자체가 사라진다.
-            //   브라우저가 요청을 무시하면 아래 리샘플 경로가 받는다.
             try { ctx = new C({ sampleRate: OPL_RATE }); }
             catch (e) { ctx = new C(); }
             master = ctx.createGain();
@@ -781,15 +643,12 @@ function DoomGame(props) {
           } catch (e) { state = "failed"; onNote(state + ": " + e); return state; }
         }
         if (ctx.state === "suspended" && typeof ctx.resume === "function") {
-          try { ctx.resume(); } catch (e) { /* 무시 */ }
+          try { ctx.resume(); } catch (e) {  }
         }
         startMusic();
         onNote(state);
         return state;
       },
-
-      // 껐다 켠다. **처음 부를 때는 반드시 사용자 제스처 안이어야 한다** —
-      // 그때 컨텍스트가 만들어지기 때문이다. 그 뒤로는 게인만 오간다.
       toggle: function () {
         if (!ctx) return this.resume();
         if (state === "on") { state = "muted"; try { master.gain.value = 0; } catch (e) {} }
@@ -797,106 +656,74 @@ function DoomGame(props) {
         onNote(state);
         return state;
       },
-
-      // 인스턴스화 직후 exports 를 넘겨준다. 음악은 이게 있어야 당겨올 수 있다.
       setEngine: function (x) { engine = x; startMusic(); },
-
       state: function () { return state + (ctx ? "/" + ctx.state : ""); },
-
-      // wasm 에 넘길 import 넷. **어떤 경우에도 throw 하면 안 된다** —
-      // import 에서 throw 하면 wasm 이 통째로 트랩한다.
       imports: {
         js_snd_start: function (ptr, len, channel, vol, sep) {
           try {
-            if (state !== "on" || !ctx) return;   // muted 면 여기서 끝난다
+            if (state !== "on" || !ctx) return;
             var d = decode(ptr, len);
             if (!d) return;
             stop(channel);
-
             var src = ctx.createBufferSource();
             src.buffer = d.buf;
-            // 버퍼를 기본 레이트로 만들었으면 속도로 음정을 되돌린다.
             if (d.buf.sampleRate !== d.rate) src.playbackRate.value = d.rate / d.buf.sampleRate;
-
             var gain = ctx.createGain();
             gain.gain.value = Math.max(0, Math.min(1, vol / 127));
-
             var node = gain;
             var pan = null;
             if (typeof ctx.createStereoPanner === "function") {
               pan = ctx.createStereoPanner();
-              // DOOM 의 sep 는 0=왼쪽, 128=가운데, 254=오른쪽이다.
               pan.pan.value = Math.max(-1, Math.min(1, (sep - 128) / 128));
               gain.connect(pan);
               node = pan;
             }
             src.connect(gain);
             node.connect(master);
-
             src.onended = function () {
               if (channels[channel] && channels[channel].src === src) delete channels[channel];
             };
             src.start();
             channels[channel] = { src: src, gain: gain, pan: pan };
-          } catch (e) { /* 소리 하나 못 울린 것뿐이다 */ }
+          } catch (e) {  }
         },
-
         js_snd_stop: function (channel) {
-          try { stop(channel); } catch (e) { /* 무시 */ }
+          try { stop(channel); } catch (e) {  }
         },
-
         js_snd_playing: function (channel) {
           try { return channels[channel] ? 1 : 0; } catch (e) { return 0; }
         },
-
         js_snd_update: function (channel, vol, sep) {
           try {
             var c = channels[channel];
             if (!c) return;
             c.gain.gain.value = Math.max(0, Math.min(1, vol / 127));
             if (c.pan) c.pan.pan.value = Math.max(-1, Math.min(1, (sep - 128) / 128));
-          } catch (e) { /* 무시 */ }
+          } catch (e) {  }
         },
       },
     };
   };
-  // <</AUDIO>>
-
-  // <<WASI-SHIM>>
-  // 생성물이다 — 원본은 doom/src/wasi-shim.js 다. 손으로 고치지 말 것.
-  // Node 검증이 돌리는 바로 그 코드다.
   const createWasiShim = function (getMemory, opts) {
     var options = opts || {};
     var onOut = options.onOut || function () {};
     var nowMs = options.nowMs || function () { return 0; };
-
-    // WASI errno
     var OK = 0, EBADF = 8, ENOSYS = 52;
-
     var view = function () { return new DataView(getMemory().buffer); };
     var u8 = function () { return new Uint8Array(getMemory().buffer); };
-
-    // fd 0/1/2 는 표준 스트림, 3 은 preopen "." 이다.
-    // 4번부터는 path_open 이 내주는 빈 파일이다.
     var PREOPEN_FD = 3;
     var PREOPEN_NAME = ".";
     var nextFd = 4;
-    var openFds = {};        // fd → { path, pos, append }
-    var files = {};          // 경로 → Uint8Array
-
-    // 경로 정규화. wasi-libc 는 preopen 기준 상대경로를 준다("./x" 나 "x").
+    var openFds = {};
+    var files = {};
     var normPath = function (p) {
       return String(p).replace(/^\.\//, "").replace(/^\//, "");
     };
-
     var readStr = function (ptr, len) {
       var m = u8(), s = "";
       for (var i = 0; i < len; i++) s += String.fromCharCode(m[ptr + i]);
       return normPath(s);
     };
-
-    // stdout/stderr 는 줄 단위로 모아 넘긴다. DOOM 은 printf 를 조각내 부르므로
-    // 조각마다 콜백을 때리면 로그가 읽을 수 없게 된다.
     var pending = "";
     var flushLines = function (force) {
       var i;
@@ -906,8 +733,6 @@ function DoomGame(props) {
       }
       if (force && pending) { onOut(pending); pending = ""; }
     };
-
-    // iovec 배열을 하나의 바이트열로 모은다. {buf:u32, len:u32} 가 반복된다.
     var readIovs = function (ptr, cnt) {
       var v = view(), m = u8(), parts = [], total = 0, i;
       for (i = 0; i < cnt; i++) {
@@ -918,19 +743,8 @@ function DoomGame(props) {
       }
       return { parts: parts, total: total };
     };
-
     return {
-      // ── 남은 출력을 강제로 뱉는다 ────────────────────────────────────
-      // ⚠ 이게 없으면 **에러 메시지를 영영 못 본다.**
-      //   DOOM 은 printf 를 조각내 부르므로 줄 단위로 모으는데, 개행 없이
-      //   출력한 뒤 트랩이 나면 그 조각이 pending 에 갇힌 채 사라진다.
-      //   실제로 그렇게 됐다: 실기에서 D_CheckNetGame 줄(개행 없음)과 그
-      //   뒤의 진짜 에러 메시지가 통째로 안 보이고 트랩만 보고됐다.
-      //   Elyn 에는 콘솔이 없어서 이걸 놓치면 추측밖에 할 게 없다.
-      //   호출자는 wasm 호출을 try/catch 로 감싸고 catch 에서 이걸 불러야 한다.
       _flush: function () { flushLines(true); },
-
-      // ── 표준 출력 ────────────────────────────────────────────────────
       fd_write: function (fd, iovs, cnt, nwritten) {
         var r = readIovs(iovs, cnt);
         if (fd === 1 || fd === 2) {
@@ -943,8 +757,6 @@ function DoomGame(props) {
           flushLines(false);
         }
         else {
-          // 진짜 파일이면 실제로 쓴다. i_oplmusic 이 여기에 MIDI 를 쓰고
-          // 곧바로 다시 읽는다 — 버리면 음악이 안 나온다.
           var f = openFds[fd];
           if (f) {
             var cur = files[f.path] || new Uint8Array(0);
@@ -960,8 +772,6 @@ function DoomGame(props) {
         view().setUint32(nwritten, r.total, true);
         return OK;
       },
-
-      // ── 읽기 ─────────────────────────────────────────────────────────
       fd_read: function (fd, iovs, cnt, nread) {
         var f = openFds[fd];
         if (!f) { if (fd === 0) { view().setUint32(nread, 0, true); return OK; } return EBADF; }
@@ -978,9 +788,6 @@ function DoomGame(props) {
         v.setUint32(nread, total, true);
         return OK;
       },
-
-      // whence 0=SET 1=CUR 2=END. **2 를 제대로 처리해야 한다** —
-      // MIDI_LoadFile 이 fseek(END)+ftell 로 파일 크기를 잰다.
       fd_seek: function (fd, offset, whence, newOffset) {
         var f = openFds[fd];
         if (!f) return EBADF;
@@ -992,14 +799,10 @@ function DoomGame(props) {
         view().setBigUint64(newOffset, BigInt(pos), true);
         return OK;
       },
-
-      // 닫아도 **내용은 남긴다.** 쓰고 닫은 뒤 다시 열어 읽는 흐름이 있다.
       fd_close: function (fd) { delete openFds[fd]; return OK; },
-
-      // filetype 4 = regular file. 24바이트 fdstat 구조체다.
       fd_fdstat_get: function (fd, ptr) {
         var v = view();
-        v.setUint8(ptr, fd === PREOPEN_FD ? 3 : 4);   // 3 = directory
+        v.setUint8(ptr, fd === PREOPEN_FD ? 3 : 4);
         v.setUint8(ptr + 1, 0);
         v.setUint16(ptr + 2, 0, true);
         v.setUint32(ptr + 4, 0, true);
@@ -1008,13 +811,10 @@ function DoomGame(props) {
         return OK;
       },
       fd_fdstat_set_flags: function () { return OK; },
-
-      // ── preopen: "." 하나만 있다고 답한다 ────────────────────────────
-      // DOOM 이 "Using . for configuration and saves" 를 찍는 근거다.
       fd_prestat_get: function (fd, ptr) {
         if (fd !== PREOPEN_FD) return EBADF;
         var v = view();
-        v.setUint8(ptr, 0);                                   // tag 0 = dir
+        v.setUint8(ptr, 0);
         v.setUint32(ptr + 4, PREOPEN_NAME.length, true);
         return OK;
       },
@@ -1026,16 +826,10 @@ function DoomGame(props) {
         }
         return OK;
       },
-
-      // ── 열기 ─────────────────────────────────────────────────────────
-      // ⚠ **항상 성공한다.** 실패시키면 d_iwad 가 WAD 를 못 찾았다고 판단해
-      //   I_Error 로 죽는다(위 머리말 1번).
-      //   oflags bit0(1) = O_CREAT, bit3(8) = O_TRUNC.
       path_open: function (dirfd, dirflags, pathPtr, pathLen, oflags,
                            rightsBase, rightsInh, fdflags, fdOut) {
         var path = readStr(pathPtr, pathLen);
         if ((oflags & 8) || !(path in files)) {
-          // 자르기(O_TRUNC)이거나 없는 파일이면 빈 내용으로 시작한다.
           if ((oflags & 8) || (oflags & 1) || !(path in files)) files[path] = new Uint8Array(0);
         }
         var fd = nextFd++;
@@ -1043,21 +837,14 @@ function DoomGame(props) {
         view().setUint32(fdOut, fd, true);
         return OK;
       },
-
-      // ── 나머지 파일 조작: 성공했다고 하고 아무것도 안 한다 ───────────
-      // 세이브·설정 정리용이다. 남길 데가 없으므로 실패시킬 이유도 없다.
       path_create_directory: function () { return OK; },
       path_remove_directory: function () { return OK; },
       path_unlink_file: function (dirfd, pathPtr, pathLen) {
-        try { delete files[readStr(pathPtr, pathLen)]; } catch (e) { /* 무시 */ }
+        try { delete files[readStr(pathPtr, pathLen)]; } catch (e) {  }
         return OK;
       },
       path_rename: function () { return OK; },
       path_filestat_get: function () { return ENOSYS; },
-
-      // ── 시계 ─────────────────────────────────────────────────────────
-      // 나노초 단위 u64 다. 시간의 출처는 nowMs 하나로 모은다 —
-      // js_now_ms 와 여기가 서로 다른 시계를 보면 게임 시간이 어긋난다.
       clock_time_get: function (id, precision, ptr) {
         view().setBigUint64(ptr, BigInt(Math.floor(nowMs())) * BigInt(1000000), true);
         return OK;
@@ -1066,18 +853,12 @@ function DoomGame(props) {
         view().setBigUint64(ptr, BigInt(1000000), true);
         return OK;
       },
-
-      // ── 종료 ─────────────────────────────────────────────────────────
-      // I_Error 가 여기로 온다. throw 해야 호출자가 알 수 있다 —
-      // 조용히 리턴하면 wasm 이 정의되지 않은 상태로 계속 돌아간다.
       proc_exit: function (code) {
         flushLines(true);
         var e = new Error("DOOM 이 종료를 요청했다 (코드 " + code + ")");
         e.doomExit = code;
         throw e;
       },
-
-      // 호출되면 알 수 있게 남긴다. 미구현이지 조용한 성공이 아니다.
       args_get: function () { return OK; },
       args_sizes_get: function (argc, argvBuf) {
         var v = view();
@@ -1101,88 +882,53 @@ function DoomGame(props) {
       sched_yield: function () { return OK; },
     };
   };
-  // <</WASI-SHIM>>
-
-  // <<RENDER>>
-  // ───────────────────────────────────────────────────────────
-  // 3. React 배선
-  //    ⚠ chess3d 의 실기 버그 넷이 전부 이런 자리에서 났다 — React 배선,
-  //      마운트 수명, 업로드, wasm 래퍼. 비동기는 전부 alive 가드를 건다.
-  // ───────────────────────────────────────────────────────────
   const canvasRef = useRef(null);
   const boxRef = useRef(null);
-  const engineRef = useRef(null);      // { exports, clock }
+  const engineRef = useRef(null);
   const rafRef = useRef(null);
-  const wadRef = useRef({ parts: [], want: 2 });
-  // 트랩이 났을 때 갇힌 출력을 뱉게 하려면 shim 을 붙잡고 있어야 한다.
+  const wadRef = useRef({ parts: [], want: 5 });
   const shimRef = useRef(null);
   const audioRef = useRef(null);
-
-  const [phase, setPhase] = useState('wad');   // wad → decode → boot → play | exited | fail
-  // ⚠ 실패 지점을 구분한다. 한때 플레이 중 죽어도 화면에 "부팅 실패" 가 떠서
-  //   **부팅에서 죽은 줄 알고 엉뚱한 곳을 뒤졌다.** 실제로는 전투 중이었다.
+  const [phase, setPhase] = useState('wad');
   const [failWhere, setFailWhere] = useState('boot');
-  // 다시 시작용. 올리면 부팅 이펙트가 다시 돈다.
   const [runId, setRunId] = useState(0);
-  // 압축을 푼 바이트를 들고 있는다 — 다시 시작할 때 1초짜리 해제를 또 할
-  // 이유가 없다.
   const bytesRef = useRef(null);
   const [note, setNote] = useState('WAD 조각을 모으는 중…');
   const [focused, setFocused] = useState(false);
   const [log, setLog] = useState([]);
   const [fps, setFps] = useState(0);
-  // ⚠ 브라우저는 사용자 제스처 없이 만든 오디오 컨텍스트를 suspended 로 둔다.
-  //   그래서 자동으로 켜지 않고 **버튼을 눌러야** 켜진다.
   const [audioState, setAudioState] = useState('off');
-
   const clock = useMemo(() => pickClock(), []);
-
-  // 갇힌 출력을 강제로 뱉는다. wasm 이 트랩하면 개행 없이 쓴 마지막 조각이
-  // shim 안에 남는데, 거기에 I_Error 의 메시지가 들어 있다.
   const flushOut = () => {
     const sh = shimRef.current;
-    if (sh && typeof sh._flush === 'function') { try { sh._flush(); } catch (e) { /* 무시 */ } }
+    if (sh && typeof sh._flush === 'function') { try { sh._flush(); } catch (e) {  } }
   };
-
-  // ⚠ 앞에서 끊지 말 것. 에러는 **꼬리**에 있다. 한때 40줄에서 자르고
-  //   뒤를 버렸는데, 그러면 부팅 로그만 남고 정작 실패 원인이 사라진다.
   const LOG_KEEP = 80;
   const addLog = (line) => setLog((L) => (L.length < LOG_KEEP ? L.concat(line)
     : L.slice(L.length - LOG_KEEP + 1).concat(line)));
-
-  // ── 3.1 WAD 조각 수집 ────────────────────────────────────
-  // DoomWad1/DoomWad2 가 헤드리스로 렌더되어 자기 몫의 base64 를 넘긴다.
-  // ChessPieces 가 onResult 로 디코드된 기물 데이터를 넘기는 것과 같은 패턴이다.
   const onWadPart = useCallback((index, text) => {
     const w = wadRef.current;
-    if (w.parts[index] !== undefined) return;    // 리렌더로 두 번 오는 것을 막는다
+    if (w.parts[index] !== undefined) return;
     w.parts[index] = text;
     let have = 0;
     for (let i = 0; i < w.want; i++) if (w.parts[i] !== undefined) have++;
     if (have === w.want) setPhase('decode');
     else setNote('WAD 조각 ' + have + '/' + w.want);
   }, []);
-
-  // ── 3.2 압축 해제 + 부팅 ─────────────────────────────────
   useEffect(() => {
     if (phase !== 'decode') return undefined;
     let alive = true;
-
-    // 다시 시작이면 이미 푼 바이트를 그대로 쓴다.
     if (bytesRef.current) {
       boot(bytesRef.current.wasm, bytesRef.current.wad, () => alive);
       return () => { alive = false; };
     }
-
     if (!WASM_GZ_B64) {
       setPhase('fail');
       setNote('엔진이 주입되지 않았다 (build-doom-jsx 를 안 돌렸다)');
       return undefined;
     }
-
     setNote('압축 해제 중…');
     const wadB64 = wadRef.current.parts.join('');
-
     Promise.all([gunzip(b64Bytes(WASM_GZ_B64)), gunzip(b64Bytes(wadB64))])
       .then(([wasmBytes, wadBytes]) => {
         if (!alive) return null;
@@ -1196,16 +942,12 @@ function DoomGame(props) {
         setPhase('fail');
         setNote(String(e && e.message ? e.message : e));
       });
-
     return () => { alive = false; };
   }, [phase, runId]);
-
-  // 실제 부팅. 처음과 '다시 시작' 이 같은 경로를 쓴다.
   function boot(wasmBytes, wadBytes, isAlive) {
         setNote('엔진 ' + (wasmBytes.length / 1024).toFixed(0) + ' KB · WAD '
           + (wadBytes.length / 1024).toFixed(0) + ' KB — 부팅 중…');
         setPhase('boot');
-
         let memory = null;
         const shim = createWasiShim(() => memory, {
           nowMs: clock,
@@ -1218,8 +960,6 @@ function DoomGame(props) {
         audioRef.current = audio;
         return WebAssembly.instantiate(wasmBytes, {
           wasi_snapshot_preview1: shim,
-          // ⚠ 실시간이어야 한다. 얼면 DOOM 이 멈춘다(1절 주석 참조).
-          //   사운드 import 넷도 여기 붙는다 — 없으면 인스턴스화가 실패한다.
           env: Object.assign({ js_now_ms: () => clock() >>> 0 }, audio.imports),
         }).then((r) => {
           if (!isAlive()) return;
@@ -1227,32 +967,21 @@ function DoomGame(props) {
           const x = inst.exports;
           memory = x.memory;
           if (typeof x._initialize === 'function') x._initialize();
-
-          // WAD 를 선형 메모리에 올린다.
-          // ⚠ memory.buffer 는 grow 하면 갈아치워진다. 뷰를 미리 잡아두면
-          //   detached ArrayBuffer 를 쓰게 되므로 **매번 새로 잡는다.**
           const ptr = x.doom_wad_alloc(wadBytes.length);
           if (!ptr) throw new Error('WAD 를 담을 메모리를 못 잡았다');
           new Uint8Array(x.memory.buffer).set(wadBytes, ptr);
-
           x.doom_init();
-          audio.setEngine(x);   // 음악을 당겨올 수 있게 exports 를 넘긴다
+          audio.setEngine(x);
           engineRef.current = { x };
           setPhase('play');
           setNote('');
         });
   }
-
-  // ── 3.3 프레임 루프 ──────────────────────────────────────
-  // 밀어내지 않고 당겨간다 — DG_DrawFrame 은 아무것도 안 하고, 여기서
-  // 틱을 돌린 뒤 프레임버퍼를 읽어 캔버스에 올린다. 그래야 프레임 예산을
-  // JS 가 쥔다.
   useEffect(() => {
     if (phase !== 'play') return undefined;
     const eng = engineRef.current;
     const cv = canvasRef.current;
     if (!eng || !cv || typeof cv.getContext !== 'function') return undefined;
-
     const x = eng.x;
     const W = x.doom_width();
     const H = x.doom_height();
@@ -1260,54 +989,33 @@ function DoomGame(props) {
     cv.height = H;
     const ctx = cv.getContext('2d');
     if (!ctx) return undefined;
-
     let img = null;
     try { img = new ImageData(W, H); }
     catch (e) { img = ctx.createImageData(W, H); }
     const dst = new Uint32Array(img.data.buffer);
-
     let alive = true;
     let frames = 0;
     let mark = clock();
     const hasRaf = typeof requestAnimationFrame === 'function';
-
-    // ⚠ **DOOM 은 35Hz 다. rAF 마다 부르면 안 된다.**
-    //   TryRunTics 는 다음 틱이 될 때까지 I_Sleep(1) 로 기다리는데, 우리 쪽
-    //   I_Sleep 은 no-op 이라(브라우저 메인스레드는 잠들면 안 된다) 그게
-    //   **바쁜 대기**가 된다. 60Hz rAF 마다 부르면 매 프레임 그 차이만큼
-    //   CPU 를 그냥 태운다 — 실측 14.27ms/프레임. 예산이 16.7ms 인데.
-    //   E1M2 처럼 렌더가 무거운 판에서 그게 넘치면 메인스레드가 밀려
-    //   **페이지가 통째로 멎는다.** 실기에서 그렇게 보고됐다.
-    //   35Hz 로 맞춰 부르면 같은 호출이 0.39ms 다.
     const TIC_MS = 1000 / 35;
     let nextTic = clock();
-
     const tick = () => {
       if (!alive) return;
       const now = clock();
       if (now < nextTic) {
-        // 아직 DOOM 의 다음 틱이 아니다. 아무것도 하지 않고 다음 프레임을 기다린다.
         rafRef.current = hasRaf ? requestAnimationFrame(tick) : setTimeout(tick, 4);
         return;
       }
       nextTic += TIC_MS;
-      // 크게 밀렸으면(탭이 백그라운드였다가 돌아온 경우) 따라잡기를 포기한다.
-      // 안 그러면 밀린 만큼 틱을 몰아쳐 화면이 튄다.
       if (now - nextTic > 250) nextTic = now + TIC_MS;
       try {
         x.doom_tick();
-        // 메뉴에서 게임을 끝냈는가. doomgeneric 의 I_Quit 은 프로세스를 안
-        // 끝내고 리턴하므로(doom/src/doomgeneric_wasm.c 참조) 여기서 멈춰야
-        // 한다 — 한 틱만 더 돌아도 해제된 메모리를 밟는다.
         if (typeof x.doom_exited === 'function' && x.doom_exited()) {
           alive = false;
           setPhase('exited');
           return;
         }
-        // DG_ScreenBuffer 는 이미 uint32 XRGB 다. 팔레트 변환이 필요 없다.
-        // ⚠ 주소도 뷰도 매번 새로 잡는다 — grow 하면 둘 다 무효가 된다.
         const src = new Uint32Array(x.memory.buffer, x.doom_frame_ptr(), W * H);
-        // XRGB → 리틀엔디언 ABGR (캔버스가 읽는 순서)
         for (let i = 0, n = W * H; i < n; i++) {
           const v = src[i];
           dst[i] = (0xff000000 | ((v & 255) << 16) | (v & 0xff00) | ((v >> 16) & 255)) >>> 0;
@@ -1315,10 +1023,7 @@ function DoomGame(props) {
         ctx.putImageData(img, 0, 0);
       } catch (e) {
         alive = false;
-        flushOut();   // 플레이 중 죽는 경우도 원인이 버퍼에 갇힌다
-        // ⚠ 코드 0 은 **정상 종료다.** 메뉴에서 Quit Game 을 고르면 우리
-        //   종료 훅이 _Exit(0) 을 부르고, WASI proc_exit 이 예외로 올라온다
-        //   (doom/src/doomgeneric_wasm.c). 오류로 표시하면 안 된다.
+        flushOut();
         if (e && e.doomExit === 0) { setPhase('exited'); return; }
         setFailWhere('play');
         setPhase('fail');
@@ -1326,14 +1031,10 @@ function DoomGame(props) {
         return;
       }
       frames++;
-      // 위에서 이미 잡은 now 를 그대로 쓴다 — 같은 프레임의 시각이다.
-      // (한때 여기서 const now 를 또 선언해 "Identifier 'now' has already
-      //  been declared" 로 컴포넌트가 통째로 안 떴다.)
       if (now - mark >= 1000) { setFps(Math.round((frames * 1000) / (now - mark))); frames = 0; mark = now; }
       rafRef.current = hasRaf ? requestAnimationFrame(tick) : setTimeout(tick, 16);
     };
     rafRef.current = hasRaf ? requestAnimationFrame(tick) : setTimeout(tick, 16);
-
     return () => {
       alive = false;
       if (rafRef.current == null) return;
@@ -1341,21 +1042,12 @@ function DoomGame(props) {
       else if (typeof clearTimeout === 'function') clearTimeout(rafRef.current);
     };
   }, [phase]);
-
-  // ── 3.4 입력 ─────────────────────────────────────────────
-  // React 합성 이벤트가 유일한 경로다 — Elyn 에는 window 가 없어서
-  // 전역 리스너를 걸 수 없다. **포커스를 잃으면 조작이 끊긴다.**
   const onKey = (e, pressed) => {
-    // ` 는 소리 토글이다. **DOOM 으로 넘기지 않는다** — 넘기면 치트 버퍼에
-    // 들어간다. DOOM 이 안 쓰는 키를 골랐다.
     if (e.code === 'Backquote') {
       if (typeof e.preventDefault === 'function') e.preventDefault();
       if (pressed) toggleAudio(false);
       return;
     }
-    // E = 사용(문 열기). **문자 'e' 도 함께 보낸다** — 치트는 타이핑한
-    // 글자를 읽으므로(idclev 등에 e 가 들어간다) 사용 키로만 바꾸면
-    // 그 치트들이 죽는다. 둘 다 보내면 양쪽이 산다.
     if (e.code === 'KeyE') {
       if (typeof e.preventDefault === 'function') e.preventDefault();
       const eng0 = engineRef.current;
@@ -1364,27 +1056,15 @@ function DoomGame(props) {
     }
     const k = toDoomKey(e);
     if (!k) return;
-    // 방향키·스페이스가 채팅창을 스크롤시키면 게임이 안 된다.
     if (typeof e.preventDefault === 'function') e.preventDefault();
     const eng = engineRef.current;
     if (eng) eng.x.doom_key(pressed ? 1 : 0, k);
   };
-
-  // ── 3.5 오디오 ───────────────────────────────────────────
-  // 버튼을 누르면 포커스가 버튼으로 간다. 그대로 두면 **키가 안 들어온다**
-  // (Elyn 에는 window 가 없어 포커스를 쥔 엘리먼트만 키를 받는다).
-  // 그래서 켠 뒤 곧바로 게임으로 되돌린다.
-  // 버튼과 단축키(`) 둘 다 여기로 온다.
-  //   · 버튼은 **발견하기 쉽다.** 대신 누르면 포커스를 뺏긴다.
-  //   · 단축키는 **포커스를 안 뺏는다.** 대신 안내를 봐야 안다.
-  // 그래서 둘 다 둔다. 버튼 쪽만 포커스를 되돌리면 된다.
   const toggleAudio = (refocus) => {
     const a = audioRef.current;
     if (a) setAudioState(a.toggle());
     if (refocus) { const el = boxRef.current; if (el && el.focus) el.focus(); }
   };
-
-  // ── 3.6 표시 ─────────────────────────────────────────────
   const S = {
     wrap: {
       fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Consolas, monospace',
@@ -1419,12 +1099,9 @@ function DoomGame(props) {
       overflowY: 'auto', fontSize: 10, border: '1px solid #2a303a',
     },
   };
-
   const playing = phase === 'play';
   const failed = phase === 'fail';
   const exited = phase === 'exited';
-
-  // 다시 시작. 압축은 이미 풀어놨으므로 인스턴스만 새로 만든다.
   const restart = () => {
     engineRef.current = null;
     setLog([]);
@@ -1432,7 +1109,6 @@ function DoomGame(props) {
     setRunId((n) => n + 1);
     setPhase('decode');
   };
-
   return (
     <div style={S.wrap}>
       <div style={S.stage}>
@@ -1448,7 +1124,6 @@ function DoomGame(props) {
         >
           <canvas ref={canvasRef} width={640} height={400} style={S.cv} />
         </div>
-
         {(!playing || !focused) && (
           <div
             style={S.veil}
@@ -1505,7 +1180,6 @@ function DoomGame(props) {
           </div>
         )}
       </div>
-
       <div style={S.bar}>
         <span style={{ color: '#88c0d0' }}>DOOM</span>
         <span>v{DOOM_BUILD}</span>
@@ -1532,13 +1206,7 @@ function DoomGame(props) {
                 : audioState === 'failed' ? '♪ 오디오 실패' : '♪ 소리 켜기'}
         </button>
       </div>
-
-      {/* ⚠ 조작 안내를 뭉뚱그리지 말 것.
-          한때 "이동 WASD·방향키" 한 줄로 적었는데, 그러면 **방향키가 회전**
-          이라는 게 안 드러난다. WASD 만 쓰면 A/D 가 스트레이프라 회전할
-          방법이 없어서 "회전 기능이 없다"고 읽힌다 — 실제로 그렇게 보고됐다.
-          마우스룩은 안 넣는다: 샌드박스 iframe 에서 포인터 락이 막힐 공산이
-          크고, 드래그 룩은 조작감이 나쁘다. */}
+      {}
       <div style={S.keys}>
         <span><b style={S.k}>← →</b> 회전</span>
         <span><b style={S.k}>↑ ↓</b> / <b style={S.k}>W S</b> 전진·후진</span>
@@ -1551,16 +1219,17 @@ function DoomGame(props) {
         <span><b style={S.k}>Enter</b> 메뉴 선택</span>
         <span><b style={S.k}>`</b> 소리 켜기/끄기</span>
       </div>
-
       {(failed || !playing) && log.length > 0 && (
         <pre style={S.pre}>{log.join('\n')}</pre>
       )}
-
       {/* WAD 운반체. 헤드리스라 아무것도 안 그린다.
-          ⚠ 3개 모두 레지스트리에 등록돼야 한다. 하나라도 빠지면 위 단계가
+          ⚠ 6개 모두 레지스트리에 등록돼야 한다. 하나라도 빠지면 위 단계가
             'wad' 에서 멈춘 채로 있는다. */}
-      <DoomWad1 onData={(t) => onWadPart(0, t)} />
-      <DoomWad2 onData={(t) => onWadPart(1, t)} />
+      <FreedoomWad1 onData={(t) => onWadPart(0, t)} />
+      <FreedoomWad2 onData={(t) => onWadPart(1, t)} />
+      <FreedoomWad3 onData={(t) => onWadPart(2, t)} />
+      <FreedoomWad4 onData={(t) => onWadPart(3, t)} />
+      <FreedoomWad5 onData={(t) => onWadPart(4, t)} />
     </div>
   );
 }

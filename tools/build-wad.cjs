@@ -47,11 +47,26 @@ const KEEP_INTER = argv.includes("--intermission");
 const WHOLE = argv.includes("--whole");
 const WITH_SOUND = argv.includes("--sound");
 const pos = argv.filter((a) => a.indexOf("--") !== 0);
-const [SRC, MAP, OUT_ARG] = pos;
-if (!SRC || !MAP) {
-  console.error("사용: node tools/build-wad.cjs <원본wad> <맵> [출력] [--whole|--sound] [--intermission]");
+const [SRC, MAP_ARG, OUT_ARG] = pos;
+if (!SRC || !MAP_ARG) {
+  console.error("사용: node tools/build-wad.cjs <원본wad> <맵> [출력] [--whole|--sound]");
+  console.error("  맵은 하나(E1M1), 쉼표 목록(E1M1,E1M2), 또는 에피소드 전체(E1)");
   process.exit(1);
 }
+
+// 맵 지정을 풀어낸다.
+//   E1M1          한 판
+//   E1M1,E1M4     고른 판들
+//   E1            에피소드 전체 (E1M1..E1M9)
+// 여러 판을 담아도 두 배가 되지 않는다 — 텍스처와 스프라이트를 공유하므로
+// 늘어나는 건 대체로 맵 지오메트리와 곡 정도다.
+const MAPS = MAP_ARG.toUpperCase().split(",").reduce((acc, tok) => {
+  const ep = tok.match(/^E([1-4])$/);
+  if (ep) { for (let i = 1; i <= 9; i++) acc.push("E" + ep[1] + "M" + i); }
+  else acc.push(tok);
+  return acc;
+}, []);
+const MAP = MAPS[0];
 const OUT = OUT_ARG || path.join(__dirname, "..", "doom", "build", "doom.wad");
 
 // ── 라이선스 가드 ────────────────────────────────────────────────────
@@ -88,8 +103,9 @@ if (WHOLE) {
   process.exit(0);
 }
 
+let demoReport = null;
 const wad = parseWad(SRC);
-const A = analyze(wad, MAP, { keepIntermission: KEEP_INTER, sound: WITH_SOUND });
+const A = analyze(wad, MAPS, { keepIntermission: KEEP_INTER, sound: WITH_SOUND });
 
 // ── 새 TEXTURE1 조립 ─────────────────────────────────────────────────
 // 포맷: numtextures(i32) · offsets[n](i32) · maptexture_t 들
@@ -202,6 +218,56 @@ for (const L of wad.lumps) {
   if (keepNames.has(n)) picked.push({ L, name: n });
 }
 
+// ── 데모(어트랙트 루프) ──────────────────────────────────────────────
+//
+// 타이틀 화면에 가만히 두면 DOOM 은 DEMO1 → 크레딧 → DEMO2 → … 를 재생한다.
+// 그런데 **데모는 자기가 어느 맵인지 헤더에 적어두고 그 맵을 요구한다.**
+// Freedoom Phase 1 의 데모는 E1M6 · E2M4 · E3M9 · E4M6 를 가리키는데
+// 우리는 에피소드 1 만 싣는다. 그대로 두면 타이틀에서 몇 초 기다린 것만으로
+// "W_GetNumForName: E2M4 not found!" 로 죽는다 — 가만히 있다가 죽는 셈이라
+// 제일 나쁜 종류의 버그다.
+//
+// 그래서 **싣는 맵을 가리키는 데모로 바꿔친다.** 쓸 수 있는 데모가 하나라도
+// 있으면 그것을 복제하고(어트랙트 루프가 실제로 돌아간다), 하나도 없으면
+// 즉시 끝나는 14바이트짜리를 넣는다(루프가 다음 화면으로 넘어가기만 한다).
+//
+// 헤더(v1.9): version skill episode map deathmatch respawn fast nomonsters
+//             consoleplayer  +  playeringame[4]   = 13바이트, 그다음 틱 데이터.
+//             0x80(DEMOMARKER) 이 끝이다.
+{
+  const shipped = new Set(A.maps);
+  const demoMap = (b) => "E" + b[2] + "M" + b[3];
+
+  // 그대로 쓸 수 있는 데모 하나를 고른다.
+  let donor = null;
+  for (const L of A.demoLumps) {
+    if (shipped.has(demoMap(wad.data(L)))) { donor = wad.data(L); break; }
+  }
+
+  const stub = (() => {
+    const m = A.maps[0].match(/^E(\d)M(\d)$/);
+    const b = Buffer.alloc(14);
+    b[0] = 109;                       // 버전 1.9
+    b[1] = 2;                         // 스킬
+    b[2] = m ? Number(m[1]) : 1;
+    b[3] = m ? Number(m[2]) : 1;
+    b[8] = 0;                         // consoleplayer
+    b[9] = 1;                         // playeringame[0]
+    b[13] = 0x80;                     // 즉시 종료
+    return b;
+  })();
+
+  let kept = 0;
+  let swapped = 0;
+  for (const L of A.demoLumps) {
+    const own = wad.data(L);
+    if (shipped.has(demoMap(own))) { picked.push({ L, name: L.name }); kept++; continue; }
+    picked.push({ L, name: L.name, replace: donor || stub });
+    swapped++;
+  }
+  demoReport = { kept, swapped, donor: !!donor };
+}
+
 // ── 쓰기 ─────────────────────────────────────────────────────────────
 // 헤더 12B · 럼프 데이터 · 디렉터리(16B × n)
 const bodies = picked.map((p) => (p.replace ? p.replace : wad.data(p.L)));
@@ -243,7 +309,12 @@ console.log("  크기      " + kb(wad.buf.length) + " → " + kb(out.length)
   + "  (" + ((100 * out.length) / wad.buf.length).toFixed(1) + "%)");
 console.log("  gzip      " + kb(gz.length) + "  → base64 " + kb(b64));
 console.log("  효과음    " + (WITH_SOUND ? A.sounds.size + "개 포함" : "제외 (--sound 로 포함)"));
-console.log("  인터미션  " + (KEEP_INTER ? "포함" : "제외 (--intermission 으로 포함)"));
+console.log("  맵        " + A.maps.length + "개  " + A.maps.join(" "));
+console.log("  프런트엔드 타이틀 · 메뉴 · 인터미션 · 피날레 포함");
+if (demoReport) {
+  console.log("  데모      " + demoReport.kept + "개 그대로 · " + demoReport.swapped
+    + "개 교체 (" + (demoReport.donor ? "싣는 맵의 데모로 복제" : "즉시 끝나는 더미") + ")");
+}
 
 if (A.missingTex.length) {
   console.log("");

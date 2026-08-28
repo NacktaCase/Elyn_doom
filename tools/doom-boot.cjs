@@ -21,7 +21,9 @@ const { createDoomAudio } = require("../doom/src/audio.js");
 
 const ROOT = path.join(__dirname, "..");
 const WASM = path.join(ROOT, "doom", "build", "doom-Oz.wasm");
-const WAD = path.join(ROOT, "doom", "build", "doom.wad");
+const wi = process.argv.indexOf("--wad");
+const WAD = wi >= 0 ? path.resolve(ROOT, process.argv[wi + 1])
+                    : path.join(ROOT, "doom", "build", "doom.wad");
 const TICKS = parseInt(process.argv[2], 10) || 60;
 
 for (const f of [WASM, WAD]) {

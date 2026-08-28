@@ -30,10 +30,22 @@ const ROOT = path.join(__dirname, "..");
 // (예전에는 dist 가 저장소본과 줄바꿈 빼고 바이트 동일해서 그 등식이
 //  성립했지만, 주석을 벗기면서 깨졌다.)
 const DIST = process.argv.includes("--dist");
-const SRC_DIR = path.join(ROOT, DIST ? "dist-doom" : "doom");
-const GAME = path.join(SRC_DIR, "DoomGame.jsx");
+
+// ── 이름 붙은 변종 ───────────────────────────────────────────────────
+// build-doom-jsx.cjs --name Freedoom 로 뽑은 한 벌을 검사하려면 여기도
+// 같은 이름을 줘야 한다. 기본은 Doom 이다.
+//   node tools/doom-selftest.cjs --name Freedoom --wad doom/build/freedoom-e1.wad
+const argOf = (flag, dflt) => {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 ? process.argv[i + 1] : dflt;
+};
+const NAME = argOf("--name", "Doom");
+const GAME_FILE = NAME + "Game.jsx";
+const WAD_RE = new RegExp("^" + NAME + "Wad[0-9]+[.]jsx$");
+const SRC_DIR = path.join(ROOT, DIST ? "dist-" + NAME.toLowerCase() : "doom");
+const GAME = path.join(SRC_DIR, GAME_FILE);
 const WASM_SRC = path.join(ROOT, "doom", "build", "doom-Oz.wasm");
-const WAD_SRC = path.join(ROOT, "doom", "build", "doom.wad");
+const WAD_SRC = path.resolve(ROOT, argOf("--wad", path.join("doom", "build", "doom.wad")));
 
 let failures = 0;
 const fail = (m) => { failures++; console.log("  ✗ " + m); };
@@ -42,13 +54,13 @@ const info = (m) => console.log("    " + m);
 
 const gameSrc = fs.readFileSync(GAME, "utf8");
 const wadFiles = fs.readdirSync(SRC_DIR)
-  .filter((f) => /^DoomWad\d+\.jsx$/.test(f))
+  .filter((f) => WAD_RE.test(f))
   .sort((a, b) => parseInt(a.match(/\d+/)[0], 10) - parseInt(b.match(/\d+/)[0], 10));
 
 // ═══ A. 구조 ═════════════════════════════════════════════════════════
 console.log("\nA. 구조");
 {
-  const all = [["DoomGame.jsx", gameSrc]].concat(
+  const all = [[GAME_FILE, gameSrc]].concat(
     wadFiles.map((f) => [f, fs.readFileSync(path.join(SRC_DIR, f), "utf8")]));
 
   for (const [name, src] of all) {
@@ -77,7 +89,7 @@ console.log("\nA. 구조");
   for (const f of wadFiles) {
     const tag = "<" + f.replace(".jsx", "");
     if (gameSrc.indexOf(tag) >= 0) ok("DoomGame 이 " + f.replace(".jsx", "") + " 를 렌더한다");
-    else fail("DoomGame 이 " + f.replace(".jsx", "") + " 를 안 그린다 — WAD 가 안 모인다");
+    else fail(NAME + "Game 이 " + f.replace(".jsx", "") + " 를 안 그린다 — WAD 가 안 모인다");
   }
 }
 
@@ -91,7 +103,7 @@ console.log("\nA. 구조");
 console.log("\nA2. 중복 선언");
 {
   const { findDuplicateDeclarations } = require("./check-dupe-decl.cjs");
-  const all = [["DoomGame.jsx", gameSrc]].concat(
+  const all = [[GAME_FILE, gameSrc]].concat(
     wadFiles.map((f) => [f, fs.readFileSync(path.join(SRC_DIR, f), "utf8")]));
   let bad = 0;
   for (const [name, raw] of all) {
@@ -111,7 +123,7 @@ console.log("\nA2. 중복 선언");
 console.log("\nA3. 미선언 참조");
 {
   const { findUndeclared } = require("./check-undeclared.cjs");
-  const targets = [["DoomGame.jsx", gameSrc]];
+  const targets = [[GAME_FILE, gameSrc]];
   let bad = 0;
   for (const [name, raw] of targets) {
     for (const d of findUndeclared(raw)) {
@@ -133,7 +145,7 @@ console.log("\nA3. 미선언 참조");
 // ═══ B. 샌드박스 규약 + 정적 스캐너 ══════════════════════════════════
 console.log("\nB. 샌드박스 규약 · 정적 스캐너");
 {
-  const all = [["DoomGame.jsx", gameSrc]].concat(
+  const all = [[GAME_FILE, gameSrc]].concat(
     wadFiles.map((f) => [f, fs.readFileSync(path.join(SRC_DIR, f), "utf8")]));
 
   // 확인된 차단어 + 같은 부류. **주석도 소스다** — 업로드본은 주석을
@@ -195,7 +207,7 @@ let wadBytes = null;
     if (!stale) ok("주입 자리표시자 없음 (wasm · shim · audio)");
   }
 
-  if (!wasmB64) fail("DoomGame.jsx 에서 WASM_GZ_B64 를 못 읽었다 (주입 안 됨?)");
+  if (!wasmB64) fail(GAME_FILE + " 에서 WASM_GZ_B64 를 못 읽었다 (주입 안 됨?)");
   else {
     wasmBytes = zlib.gunzipSync(Buffer.from(wasmB64, "base64"));
     const orig = fs.readFileSync(WASM_SRC);
@@ -352,7 +364,7 @@ if (!wasmBytes || !wadBytes) {
 function report() {
   console.log("\nE. 크기 (CRLF 업로드본 기준)");
   let total = 0;
-  for (const f of ["DoomGame.jsx"].concat(wadFiles)) {
+  for (const f of [GAME_FILE].concat(wadFiles)) {
     const b = Buffer.byteLength(
       fs.readFileSync(path.join(SRC_DIR, f), "utf8").replace(/\r?\n/g, "\r\n"), "utf8");
     total += b;

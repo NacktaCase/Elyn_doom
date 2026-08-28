@@ -20,17 +20,61 @@ const zlib = require("zlib");
 const crypto = require("crypto");
 
 const ROOT = path.join(__dirname, "..");
-const OUT = path.join(ROOT, "doom", "vendor", "doom1.wad");
+// ── 받을 것 두 가지 ──────────────────────────────────────────────────
+//
+//   node tools/fetch-wad.cjs               DOOM 셰어웨어 (기본)
+//   node tools/fetch-wad.cjs --freedoom    Freedoom Phase 1
+//
+// 둘의 처지가 다르다:
+//
+//   셰어웨어  id Software 것이다. "완전하고 변형되지 않은" 재배포만 허용되고,
+//             그래서 build-wad.cjs 가 해시를 알아보면 프루닝을 거부한다.
+//   Freedoom  BSD-3-Clause 다. 깎아도 되고 고쳐도 된다. Phase 1 은 28 MB 라
+//             통째로는 못 싣고, 프루닝을 전제로만 쓸 수 있다.
+//
+// md5 는 **우리가 실제로 빌드해 본 판**의 해시다. 다르면 지우지 않고
+// 경고만 한다 — Freedoom 은 계속 새 판이 나오고, 새 판이 틀린 건 아니다.
+// 다만 "여기서 검증한 그 판이 아니다"는 것은 알아야 한다.
+const FREEDOOM = process.argv.includes("--freedoom");
 
-// DOOM 셰어웨어 v1.9 의 정본 해시.
-const WANT_MD5 = "f0cefca49926d00903cf57551d901abe";
-const WANT_SIZE = 4196020;
+const TARGETS = {
+  shareware: {
+    out: path.join(ROOT, "doom", "vendor", "doom1.wad"),
+    md5: "f0cefca49926d00903cf57551d901abe",   // DOOM 셰어웨어 v1.9 정본
+    size: 4196020,
+    strict: true,                               // 해시가 다르면 버린다
+    want: null,
+    sources: [
+      { url: "https://www.doomworld.com/3ddownloads/ports/shareware_doom_iwad.zip", zip: true },
+      { url: "https://github.com/Akbar30Bill/DOOM_wads/raw/master/doom1.wad", zip: false },
+    ],
+    note: [
+      "셰어웨어는 **변형 없이 통째로** 재배포할 수 있다.",
+      "tools/build-wad.cjs 가 이 해시를 알아보고 프루닝을 막는다.",
+    ],
+  },
+  freedoom: {
+    out: path.join(ROOT, "doom", "vendor", "freedoom1.wad"),
+    md5: "b93be13d05148dd01614bc205a03648e",   // Freedoom Phase 1 0.13.0
+    size: 28795076,
+    strict: false,                              // 새 판이면 경고만 한다
+    want: "freedoom1.wad",
+    sources: [
+      { url: "https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip", zip: true },
+    ],
+    note: [
+      "Freedoom 은 BSD-3-Clause 다 — 깎아도 되고 고쳐도 된다.",
+      "28 MB 라 통째로는 못 싣는다. 에피소드 1 만 뽑으려면:",
+      "  node tools/build-wad.cjs doom/vendor/freedoom1.wad E1 doom/build/freedoom-e1.wad --sound",
+    ],
+  },
+};
 
-// 순서대로 시도한다. 앞엣것이 정본 커뮤니티 아카이브다.
-const SOURCES = [
-  { url: "https://www.doomworld.com/3ddownloads/ports/shareware_doom_iwad.zip", zip: true },
-  { url: "https://github.com/Akbar30Bill/DOOM_wads/raw/master/doom1.wad", zip: false },
-];
+const T = FREEDOOM ? TARGETS.freedoom : TARGETS.shareware;
+const OUT = T.out;
+const WANT_MD5 = T.md5;
+const WANT_SIZE = T.size;
+const SOURCES = T.sources;
 
 function get(url, depth) {
   return new Promise((resolve, reject) => {
@@ -54,7 +98,7 @@ function get(url, depth) {
 
 // zip 에서 첫 번째 .wad 를 꺼낸다. 라이브러리를 끌어오지 않으려고 직접 읽는다 —
 // 항목이 하나뿐인 단순한 zip 이라 중앙 디렉터리만 훑으면 된다.
-function extractWadFromZip(buf) {
+function extractWadFromZip(buf, want) {
   // End of Central Directory 를 뒤에서 찾는다 (시그니처 0x06054b50).
   let eocd = -1;
   for (let i = buf.length - 22; i >= 0 && i > buf.length - 70000; i--) {
@@ -75,7 +119,7 @@ function extractWadFromZip(buf) {
     const localOff = buf.readUInt32LE(p + 42);
     const name = buf.toString("ascii", p + 46, p + 46 + nameLen);
 
-    if (/\.wad$/i.test(name)) {
+    if (want ? name.toLowerCase().endsWith(want) : name.toLowerCase().endsWith(".wad")) {
       // 로컬 헤더에서 실제 데이터 위치를 계산한다(이름·extra 길이가 다를 수 있다).
       if (buf.readUInt32LE(localOff) !== 0x04034b50) throw new Error("로컬 헤더가 깨졌다");
       const lnLen = buf.readUInt16LE(localOff + 26);
@@ -88,10 +132,12 @@ function extractWadFromZip(buf) {
     }
     p += 46 + nameLen + extraLen + cmtLen;
   }
-  throw new Error("zip 안에 .wad 가 없다");
+  throw new Error("zip 안에 " + (want || ".wad") + " 가 없다");
 }
 
 (async () => {
+  const label = path.basename(OUT);
+
   if (fs.existsSync(OUT)) {
     const have = fs.readFileSync(OUT);
     const md5 = crypto.createHash("md5").update(have).digest("hex");
@@ -99,22 +145,33 @@ function extractWadFromZip(buf) {
       console.log("이미 있다: " + path.relative(ROOT, OUT) + "  (md5 확인됨)");
       return;
     }
+    if (!T.strict) {
+      // Freedoom 은 판이 계속 올라간다. 다른 판이 이미 있으면 그건
+      // **틀린 게 아니라 다른 것**이다. 덮어쓰지 않고 알려만 준다.
+      console.log("이미 있다: " + path.relative(ROOT, OUT));
+      console.log("  md5 " + md5 + "  — 여기서 검증한 판(" + WANT_MD5 + ")과 다르다.");
+      console.log("  그대로 써도 되지만 결과가 조금 달라질 수 있다.");
+      console.log("  받은 판으로 맞추려면 파일을 지우고 다시 돌려라.");
+      return;
+    }
     console.log("있는 파일의 md5 가 다르다. 다시 받는다.");
   }
 
   let wad = null;
+  let gotMd5 = null;
   for (const src of SOURCES) {
     try {
       process.stdout.write("받는 중: " + src.url + " … ");
       const buf = await get(src.url);
-      const got = src.zip ? extractWadFromZip(buf) : buf;
+      const got = src.zip ? extractWadFromZip(buf, T.want) : buf;
       const md5 = crypto.createHash("md5").update(got).digest("hex");
-      if (md5 !== WANT_MD5) {
+      if (md5 !== WANT_MD5 && T.strict) {
         console.log("md5 불일치 (" + md5 + ")");
         continue;
       }
-      console.log("ok");
+      console.log(md5 === WANT_MD5 ? "ok" : "ok (md5 다름 — 아래 참고)");
       wad = got;
+      gotMd5 = md5;
       break;
     } catch (e) {
       console.log("실패 — " + (e && e.message ? e.message : e));
@@ -123,8 +180,8 @@ function extractWadFromZip(buf) {
 
   if (!wad) {
     console.error("");
-    console.error("셰어웨어 doom1.wad 를 받지 못했다.");
-    console.error("직접 구해 doom/vendor/doom1.wad 에 두어도 된다.");
+    console.error(label + " 를 받지 못했다.");
+    console.error("직접 구해 " + path.relative(ROOT, OUT) + " 에 두어도 된다.");
     console.error("  크기 " + WANT_SIZE + " 바이트 · md5 " + WANT_MD5);
     process.exit(1);
   }
@@ -133,8 +190,13 @@ function extractWadFromZip(buf) {
   fs.writeFileSync(OUT, wad);
   console.log("");
   console.log("→ " + path.relative(ROOT, OUT) + "  " + wad.length + " 바이트");
-  console.log("  md5 " + WANT_MD5 + "  (DOOM 셰어웨어 v1.9 정본)");
+  if (gotMd5 === WANT_MD5) {
+    console.log("  md5 " + gotMd5 + "  (여기서 검증한 판)");
+  } else {
+    console.log("  md5 " + gotMd5);
+    console.log("  ⚠ 여기서 검증한 판은 " + WANT_MD5 + " 다. 빌드는 되겠지만");
+    console.log("    맵·에셋이 달라 자체검증 숫자가 어긋날 수 있다.");
+  }
   console.log("");
-  console.log("셰어웨어는 **변형 없이 통째로** 재배포할 수 있다.");
-  console.log("tools/build-wad.cjs 가 이 해시를 알아보고 프루닝을 막는다.");
+  for (const line of T.note) console.log(line);
 })();

@@ -14,6 +14,7 @@
 - **소리** — OPL2 FM 합성 음악과 효과음 (원본 사운드블래스터가 내던 그 소리다)
 - **약 2.6 MiB** — 컴포넌트 세 개. 서버도, 외부 요청도, 저장소도 쓰지 않는다
 - **게임 데이터는 이 저장소에 없다** — 빌드할 때 받아온다
+- **Freedoom 판**도 같이 뽑을 수 있다 — 이름이 달라 둘을 함께 등록해 둔다
 
 ## 어떻게 돌아가나
 
@@ -139,20 +140,84 @@ node tools/doom-boot.cjs              # Node WASI 에서 실제로 부팅시킨�
 node doom/devtest/server.cjs   # http://localhost:8099
 ```
 
+## Freedoom 판
+
+에셋을 [Freedoom](https://freedoom.github.io/)(BSD-3-Clause)으로 바꿔 한 벌 더
+만들 수 있다. Elyn 레지스트리가 평면 전역이라 이름이 겹치면 안 되므로
+`FreedoomGame` · `FreedoomWad1‥5` 로 따로 등록한다 — **둘을 같이 올려둘 수 있다.**
+
+```bash
+node tools/fetch-wad.cjs --freedoom
+node tools/build-wad.cjs doom/vendor/freedoom1.wad E1 doom/build/freedoom-e1.wad --sound
+node tools/build-doom-jsx.cjs --name Freedoom --wad doom/build/freedoom-e1.wad --parts 5
+node tools/doom-selftest.cjs  --name Freedoom --wad doom/build/freedoom-e1.wad
+node tools/export-doom.cjs    --name Freedoom          # → dist-freedoom/
+```
+
+`DoomGame.jsx` 가 템플릿이고 `FreedoomGame.jsx` 는 거기서 **생성**된다.
+컴포넌트 이름·운반체 개수·배선이 전부 빌드 인자에서 나오므로 손으로 고칠 곳이 없다.
+
+### 왜 통째로 못 싣나
+
+Freedoom Phase 1 은 28 MB 다. gzip 해도 base64 로 15 MB 가 넘어 페이로드에
+안 들어간다. 그래서 **에피소드 1(E1M1‥E1M9)만 뽑는다.** 셰어웨어와 달리
+Freedoom 은 BSD 라 깎아도 되고, 그래서 `build-wad.cjs` 의 프루너가 살아 있다.
+
+같은 아홉 판인데 셰어웨어보다 두 배 넘게 든다. Freedoom 쪽 에셋이 더 크다 —
+특히 효과음이 고음질이라 그것만으로 base64 1.2 MB 다.
+
+| | WAD base64 | 컴포넌트 합계 |
+|---|---:|---:|
+| 셰어웨어 DOOM · 9판 통째 · 소리 | 2,332 KB | **2.60 MiB** |
+| Freedoom E1 · 9판 · 소리 | 5,708 KB | **5.96 MiB** |
+| Freedoom E1 · 9판 · 무음 | 4,446 KB | 4.70 MiB |
+| Freedoom E1M1‥E1M5 · 소리 | 4,409 KB | 4.67 MiB |
+| Freedoom E1M1‥E1M3 · 소리 | 4,017 KB | 4.28 MiB |
+
+무결이 확인된 최대는 4.515 MiB 다(2026-08-28). **5.96 MiB 는 그 위이므로
+미지수**고, 이 판은 용량 시험을 겸한다. 실패하면 위 표를 따라 내려가면 된다.
+
+### 프루너가 타이틀 화면을 몰랐다
+
+프루너는 `-warp` 로 맵에 바로 떨어지던 시절에 짜였다. 타이틀 화면을 되살리자
+그 전제가 전부 깨졌고, **가만히 두면 죽는** 부류의 버그가 세 겹으로 나왔다.
+
+- `GENMIDI` — OPL 악기 정의. `I_InitMusic` 이 `W_GetNumForName` 으로 찾으므로
+  음악을 끄든 말든 없으면 **부팅이 안 된다.**
+- 타이틀·피날레 곡(`D_INTRO` · `D_INTROA` · `D_BUNNY`)과 타이틀·메뉴·인터미션
+  그래픽 — 그 화면에 닿는 순간 죽는다. 이제 프런트엔드는 통째로 남긴다.
+- **데모.** 타이틀에서 몇 초 기다리면 어트랙트 루프가 돈다. 그런데 데모는
+  자기가 어느 맵인지 헤더에 적어두고 그 맵을 요구하는데, Freedoom 의 데모는
+  E1M6 · **E2M4 · E3M9 · E4M6** 를 가리킨다. 에피소드 1 만 싣는 우리로서는
+  가만히 있다가 죽는 셈이다. 그래서 **싣는 맵을 가리키는 데모로 바꿔친다**
+  (`build-wad.cjs`). 넷 다 E1M6 이 되고 어트랙트 루프는 그대로 돈다.
+
+### 남은 차이
+
+Freedoom 은 셰어웨어가 아니라 **에피소드 1 만 있는 것처럼** 감지된다
+(E2M1 이 없으므로). 메뉴에 에피소드 1 만 나오고, 없는 에피소드를 고를 길이
+없어 그 경로로는 죽지 않는다.
+
 ## 라이선스
 
 이 저장소의 코드는 **GPL-2.0** 이다. [doomgeneric](https://github.com/ozkl/doomgeneric)
 과 [chocolate-doom](https://github.com/chocolate-doom/chocolate-doom) 의 파생물이므로
 같은 조건을 따른다.
 
-**DOOM 게임 데이터는 여기 없다.** `tools/fetch-wad.cjs` 가 받아오고 md5 로 정본인지
-확인한다. 셰어웨어 IWAD 는 id Software 의 것이고 **완전하고 변형되지 않은 형태로만**
-재배포할 수 있어서, 이 저장소는 그 판단이 필요 없도록 아예 담지 않는다.
-같은 이유로:
+게임 데이터는 둘의 처지가 달라 다르게 다룬다.
 
-- `tools/build-wad.cjs` 는 셰어웨어 해시를 알아보면 프루닝을 **거부한다**
-- 타이틀 화면의 고지("PROVIDED BY id FREE OF CHARGE · SUGGESTED RETAIL PRICE
-  $9.00")가 보이도록 `-warp` 로 게임에 바로 들어가지 않는다
-
-자유 배포 에셋으로 쓰고 싶으면 [Freedoom](https://freedoom.github.io/)(BSD) 을
-쓸 수 있다. 그쪽은 프루닝이 허용되므로 맵 하나만 남기는 옵션들이 살아 있다.
+- **셰어웨어 IWAD** 는 id Software 의 것이고 **완전하고 변형되지 않은 형태로만**
+  재배포할 수 있다. 그래서 이 저장소는 그 판단이 필요 없도록 아예 담지 않고,
+  `tools/fetch-wad.cjs` 가 받아와 md5 로 확인한다. `tools/build-wad.cjs` 는
+  셰어웨어 해시를 알아보면 프루닝을 **거부한다.** 타이틀 화면의 고지("PROVIDED
+  BY id FREE OF CHARGE · SUGGESTED RETAIL PRICE $9.00")가 보이도록 `-warp` 로
+  게임에 바로 들어가지도 않는다.
+- **Freedoom** 은 BSD-3-Clause 라 깎아도 되고 고쳐도 된다. 위의 프루닝과 데모
+  교체가 허용되는 건 그래서고, 같은 이유로 **`dist-freedoom/` 는 이 저장소에
+  실제로 커밋돼 있다** — gzip+base64 로 실은 프루닝판 게임 데이터라 "바이너리
+  형태 재배포"에 해당하고, BSD 조건(저작권 고지 동봉·이름으로 보증 금지)이
+  걸리는데 [`dist-freedoom/COPYING-FREEDOOM.txt`](dist-freedoom/COPYING-FREEDOOM.txt)
+  가 그 고지를 동봉한다. 저장소 안이라 다른 파일처럼 LF 로 담겨 있고, Elyn 에
+  붙여넣을 CRLF 판은 `node tools/export-doom.cjs --name Freedoom` 로 따로
+  뽑는다. 원본 `freedoom1.wad`(28 MB, 미가공)는 여전히 담지 않고
+  `tools/fetch-wad.cjs --freedoom` 로 받는다.

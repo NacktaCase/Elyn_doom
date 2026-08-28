@@ -77,9 +77,17 @@ function expandAnim(name) {
 // ── HUD·메뉴 분류 ────────────────────────────────────────────────────
 // 맵과 무관하게 엔진이 그리는 그림들. 처음에 이걸 빼고 계산했다가 추정이
 // 낙관적으로 나왔다 — DOOM 은 상태바를 **항상** 그린다.
-const CHROME_DROP = /^(HELP\d?|CREDIT|BOSSBACK|VICTORY2|PFUB\d|ENDPIC|ENDOOM|DEMO\d)$/;
-const CHROME_MAYBE = /^(WI|INTERPIC$|TITLEPIC$)/;
+// ── 프런트엔드(타이틀·메뉴·인터미션·피날레) ─────────────────────────
+//
+// **이 목록은 `-warp` 를 쓰던 시절에 짜였다.** 그때는 부팅하자마자 맵에
+// 떨어졌으니 타이틀도 데모도 인터미션도 필요 없었다. 지금은 타이틀 화면부터
+// 시작하고 맵을 끝내면 인터미션을 지나 피날레까지 간다. 그래서 여기서
+// 버리면 **그 화면에 닿는 순간 I_Error 로 죽는다.**
+//
+// 그래서 방침을 뒤집었다: CHROME_ANY 에 걸리는 건 전부 남긴다.
+// 데모만 예외인데, 그건 아래에서 따로 다룬다(참조하는 맵이 있어야 한다).
 const CHROME_ANY = /^(ST|M_|BRDR|AMMNUM|WI|TITLEPIC$|INTERPIC$|HELP|CREDIT|BOSSBACK|VICTORY2|PFUB|ENDPIC|END$|DEMO\d)/;
+const CHROME_DEMO = /^DEMO\d$/;
 
 /**
  * 맵 하나를 남길 때 필요한 럼프를 판정한다.
@@ -87,41 +95,63 @@ const CHROME_ANY = /^(ST|M_|BRDR|AMMNUM|WI|TITLEPIC$|INTERPIC$|HELP|CREDIT|BOSSB
  * @param {string} mapName 예 "E1M1"
  * @param {object} opts { keepIntermission: boolean }
  */
-function analyze(wad, mapName, opts) {
+/**
+ * @param {string|string[]} mapNames  맵 하나 또는 여러 개. 여러 개를 주면
+ *   에셋 의존을 **합집합**으로 모은다 — 맵끼리 텍스처·스프라이트를 많이
+ *   공유하므로 두 판이 두 배가 되지 않는다.
+ */
+function analyze(wad, mapNames, opts) {
   const options = opts || {};
   const { lumps, byName, data } = wad;
-  const MAP = mapName.toUpperCase();
+  const MAPS = (Array.isArray(mapNames) ? mapNames : [mapNames]).map((m) => m.toUpperCase());
+  const MAP = MAPS[0];
 
-  const mi = lumps.findIndex((L) => L.name === MAP);
-  if (mi < 0) throw new Error("맵 없음: " + MAP);
-  const mapLumps = [lumps[mi]];
-  for (let i = mi + 1; i < lumps.length && MAP_LUMPS.indexOf(lumps[i].name) >= 0; i++) {
-    mapLumps.push(lumps[i]);
+  // 맵마다 이름 럼프 + 뒤따르는 지오메트리 럼프를 모은다.
+  const mapLumps = [];
+  const perMap = [];
+  for (const name of MAPS) {
+    const mi = lumps.findIndex((L) => L.name === name);
+    if (mi < 0) throw new Error("맵 없음: " + name);
+    const own = [lumps[mi]];
+    for (let i = mi + 1; i < lumps.length && MAP_LUMPS.indexOf(lumps[i].name) >= 0; i++) {
+      own.push(lumps[i]);
+    }
+    perMap.push({ name, lumps: own });
+    for (const L of own) mapLumps.push(L);
   }
-  const mapLump = (n) => mapLumps.find((L) => L.name === n);
+  const lumpOf = (own, n) => own.find((L) => L.name === n);
 
   // SECTORS(26B) → flat / SIDEDEFS(30B) → 텍스처 / THINGS(10B) → 종류
   const flatsUsed = new Set();
-  for (const b = data(mapLump("SECTORS")), n = b.length; ;) {
-    for (let o = 0; o + 26 <= n; o += 26) { flatsUsed.add(nameAt(b, o + 4)); flatsUsed.add(nameAt(b, o + 12)); }
-    break;
-  }
   const texUsed = new Set();
-  {
-    const b = data(mapLump("SIDEDEFS"));
-    for (let o = 0; o + 30 <= b.length; o += 30) {
-      for (const off of [4, 12, 20]) {
-        const t = nameAt(b, o + off);
-        if (t && t !== "-") texUsed.add(t);
+  const thingTypes = new Map();
+
+  for (const m of perMap) {
+    const sect = lumpOf(m.lumps, "SECTORS");
+    if (sect) {
+      const b = data(sect);
+      for (let o = 0; o + 26 <= b.length; o += 26) {
+        flatsUsed.add(nameAt(b, o + 4));
+        flatsUsed.add(nameAt(b, o + 12));
       }
     }
-  }
-  const thingTypes = new Map();
-  {
-    const b = data(mapLump("THINGS"));
-    for (let o = 0; o + 10 <= b.length; o += 10) {
-      const t = b.readInt16LE(o + 6);
-      thingTypes.set(t, (thingTypes.get(t) || 0) + 1);
+    const side = lumpOf(m.lumps, "SIDEDEFS");
+    if (side) {
+      const b = data(side);
+      for (let o = 0; o + 30 <= b.length; o += 30) {
+        for (const off of [4, 12, 20]) {
+          const t = nameAt(b, o + off);
+          if (t && t !== "-") texUsed.add(t);
+        }
+      }
+    }
+    const thg = lumpOf(m.lumps, "THINGS");
+    if (thg) {
+      const b = data(thg);
+      for (let o = 0; o + 10 <= b.length; o += 10) {
+        const t = b.readInt16LE(o + 6);
+        thingTypes.set(t, (thingTypes.get(t) || 0) + 1);
+      }
     }
   }
 
@@ -226,7 +256,11 @@ function analyze(wad, mapName, opts) {
   //
   // 필요한 것만: 그 맵의 곡 + 인터미션 + 승리 화면.
   // 타이틀 곡(d_intro)은 -warp 로 타이틀을 건너뛰므로 안 쓴다.
-  const music = new Set(["D_" + MAP, "D_INTER", "D_VICTOR"].filter((n) => byName.has(n)));
+  // 타이틀 곡(D_INTRO/D_INTROA)과 피날레 곡(D_BUNNY)도 넣는다 — 타이틀
+  // 화면부터 시작하므로 **부팅 직후 바로 필요하다.**
+  const music = new Set(MAPS.map((m) => "D_" + m)
+    .concat(["D_INTER", "D_VICTOR", "D_INTRO", "D_INTROA", "D_BUNNY"])
+    .filter((n) => byName.has(n)));
 
   // ── 효과음 ───────────────────────────────────────────────────────
   // **전부 넣는다.** 어떤 소리가 울릴지는 맵 배치가 아니라 코드가 정한다 —
@@ -243,19 +277,23 @@ function analyze(wad, mapName, opts) {
   const zones = zoneRanges(lumps);
   const inZone = (L) => Object.values(zones).some(([s, e]) => s >= 0 && e > s && L.i > s && L.i < e);
   const chromeKeep = new Set();
+  const demoLumps = [];
   for (const L of lumps) {
     if (inZone(L) || !CHROME_ANY.test(L.name)) continue;
-    if (CHROME_DROP.test(L.name)) continue;
-    if (CHROME_MAYBE.test(L.name) && !options.keepIntermission) continue;
+    if (CHROME_DEMO.test(L.name)) { demoLumps.push(L); continue; }
     chromeKeep.add(L.name);
   }
 
   return {
-    map: MAP, mapLumps, flatsUsed, texUsed, keepTex, patchesUsed,
+    map: MAP, maps: MAPS, mapLumps, flatsUsed, texUsed, keepTex, patchesUsed,
     thingTypes, sprites: spr.sprites, spriteInfo: spr,
     chromeKeep, music, sounds, pnames, texDefs, zones,
     missingTex, droppedForMissingPatch,
-    must: ["PLAYPAL", "COLORMAP", "PNAMES"],
+    demoLumps,
+    // GENMIDI 는 OPL 악기 정의다. i_oplmusic 이 **I_InitMusic 에서**
+    // W_GetNumForName("genmidi") 을 부르므로 없으면 부팅 자체가 죽는다
+    // ("W_GetNumForName: genmidi not found!"). 음악을 끄든 말든 있어야 한다.
+    must: ["PLAYPAL", "COLORMAP", "PNAMES", "GENMIDI"],
   };
 }
 

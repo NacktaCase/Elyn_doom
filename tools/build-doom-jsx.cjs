@@ -27,9 +27,27 @@ const AUDIO = path.join(ROOT, "doom", "src", "audio.js");
 const GAME = path.join(ROOT, "doom", "DoomGame.jsx");
 
 const argv = process.argv.slice(2);
-const PARTS = (() => { const i = argv.indexOf("--parts"); return i >= 0 ? parseInt(argv[i + 1], 10) : 2; })();
+const opt = (flag, dflt) => { const i = argv.indexOf(flag); return i >= 0 ? argv[i + 1] : dflt; };
+const PARTS = parseInt(opt("--parts", "2"), 10);
 
-for (const f of [WASM, WAD, SHIM, AUDIO, GAME]) {
+// ── 이름 붙은 변종 ───────────────────────────────────────────────────
+// Elyn 레지스트리는 **평면 전역**이라 같은 이름을 두 번 등록할 수 없다.
+// 그래서 다른 에셋(예: Freedoom)으로 한 벌 더 만들려면 컴포넌트 이름
+// 자체가 달라야 한다: --name Freedoom → FreedoomGame · FreedoomWad1..N
+//
+// 원본 DoomGame.jsx 는 **언제나 템플릿**이다. 기본(--name Doom)일 때만
+// 제자리에 쓰고, 변종은 새 파일로 뽑는다 — 그래야 변종을 만들다 원본을
+// 망가뜨리지 않는다.
+const NAME = opt("--name", "Doom");
+if (!/^[A-Za-z][A-Za-z0-9]*$/.test(NAME)) {
+  console.error("--name 은 식별자여야 한다: " + NAME);
+  process.exit(1);
+}
+const IN_PLACE = NAME === "Doom";
+const GAME_OUT = path.join(ROOT, "doom", NAME + "Game.jsx");
+const WAD_IN = opt("--wad", WAD);
+
+for (const f of [WASM, WAD_IN, SHIM, AUDIO, GAME]) {
   if (!fs.existsSync(f)) { console.error("없다: " + f); process.exit(1); }
 }
 
@@ -119,10 +137,43 @@ for (const name of ["WASM_GZ_B64", "createWasiShim", "createDoomAudio"]) {
   }
 }
 
-fs.writeFileSync(GAME, game);
+// ── 2.5. 운반체 배선을 다시 짠다 ─────────────────────────────────────
+// 운반체 개수와 이름은 **빌드 인자**로 정해지는데 JSX 에는 손으로 적혀
+// 있었다. 그래서 `--parts 4` 를 줘도 컴포넌트는 여전히 `want: 2` 에
+// 운반체 두 개만 렌더했다 — 조각 4개를 만들어놓고 2개만 받으니 영원히
+// 'wad' 단계에서 멈춘다. 배선을 생성물로 돌려 원리적으로 막는다.
+game = game.replace(/\bfunction DoomGame\s*\(/, "function " + NAME + "Game(");
+game = game.replace(/want:\s*\d+/, "want: " + PARTS);
+
+{
+  // 줄 단위로 바꾼다. 운반체 줄들을 걷어내고 그 자리에 생성한 줄을 넣는다.
+  const isCarrier = (L) => /^\s*<[A-Za-z0-9]+Wad\d+ onData=\{\(t\) => onWadPart\(\d+, t\)\} \/>\s*$/.test(L);
+  const src = game.split("\n");
+  const at = src.findIndex(isCarrier);
+  if (at < 0) {
+    console.error("운반체 배선을 못 찾았다 — DoomGame.jsx 의 <...WadN onData=.../> 줄이 바뀌었나?");
+    process.exit(1);
+  }
+  let stop = at;
+  while (stop < src.length && isCarrier(src[stop])) stop++;
+
+  const made = [];
+  for (let q = 0; q < PARTS; q++) {
+    made.push("      <" + NAME + "Wad" + (q + 1) + " onData={(t) => onWadPart(" + q + ", t)} />");
+  }
+  src.splice(at, stop - at, ...made);
+  game = src.join("\n");
+
+  // 개수를 세는 안내 문구도 같이 맞춘다(운반체 + 게임 컴포넌트).
+  game = game.replace(/⚠ (?:셋 다|\d+개 모두) 레지스트리에/, "⚠ " + (PARTS + 1) + "개 모두 레지스트리에");
+  game = game.replace(/\/\/   [A-Za-z0-9]+Wad1 [^\n]*?   WAD /,
+    "//   " + made.map((_, i) => NAME + "Wad" + (i + 1)).join(" · ") + "   WAD ");
+}
+
+fs.writeFileSync(GAME_OUT, game);
 
 // ── 3. WAD 를 조각내 운반체 컴포넌트로 ───────────────────────────────
-const wad = fs.readFileSync(WAD);
+const wad = fs.readFileSync(WAD_IN);
 const wadGz = zlib.gzipSync(wad, { level: 9 });
 const wadB64 = wadGz.toString("base64");
 const per = Math.ceil(wadB64.length / PARTS);
@@ -134,7 +185,7 @@ const cut = per - (per % 4);
 
 const wadFiles = [];
 for (let p = 0; p < PARTS; p++) {
-  const name = "DoomWad" + (p + 1);
+  const name = NAME + "Wad" + (p + 1);
   const slice = wadB64.slice(p * cut, p === PARTS - 1 ? undefined : (p + 1) * cut);
   const src = [
     "function " + name + "(props) {",
@@ -168,7 +219,7 @@ for (let p = 0; p < PARTS; p++) {
 
 // ── 보고 ─────────────────────────────────────────────────────────────
 const kb = (b) => (b / 1024).toFixed(0).padStart(6) + " KB";
-const gameBytes = Buffer.byteLength(fs.readFileSync(GAME, "utf8").replace(/\r?\n/g, "\r\n"), "utf8");
+const gameBytes = Buffer.byteLength(fs.readFileSync(GAME_OUT, "utf8").replace(/\r?\n/g, "\r\n"), "utf8");
 let total = gameBytes;
 
 console.log("주입 완료");
@@ -179,7 +230,7 @@ console.log("  WAD    " + kb(wad.length) + " → gzip " + kb(wadGz.length)
   + " → base64 " + kb(wadB64.length) + "  (" + PARTS + " 조각)");
 console.log("");
 console.log("  파일 (CRLF 기준)");
-console.log("    DoomGame.jsx  " + kb(gameBytes));
+console.log("    " + path.basename(GAME_OUT) + "  " + kb(gameBytes));
 for (const f of wadFiles) {
   const crlf = Buffer.byteLength(fs.readFileSync(f.file, "utf8").replace(/\r?\n/g, "\r\n"), "utf8");
   total += crlf;

@@ -23,12 +23,21 @@ const ROOT = path.join(__dirname, "..");
 const SRC_DIR = path.join(ROOT, "doom");
 const argv = process.argv.slice(2);
 const KEEP = argv.indexOf("--keep-comments") >= 0;
-const outArg = argv.filter((a) => a.indexOf("--") !== 0)[0];
-const OUT = path.resolve(outArg || path.join(ROOT, "dist-doom"));
 
-const FILES = ["DoomGame.jsx"].concat(
+// build-doom-jsx.cjs --name 으로 뽑은 변종을 그대로 받는다.
+//   node tools/export-doom.cjs --name Freedoom
+// 출력은 기본으로 dist-<소문자이름> 이다 — 한 폴더에 섞이면 어느 쪽을
+// 붙여넣는지 헷갈리고, 실제로 그런 사고가 제일 비싸다.
+const ni = argv.indexOf("--name");
+const NAME = ni >= 0 ? argv[ni + 1] : "Doom";
+const GAME_FILE = NAME + "Game.jsx";
+const WAD_RE = new RegExp("^" + NAME + "Wad[0-9]+[.]jsx$");
+const outArg = argv.filter((a, i) => a.indexOf("--") !== 0 && argv[i - 1] !== "--name")[0];
+const OUT = path.resolve(outArg || path.join(ROOT, "dist-" + NAME.toLowerCase()));
+
+const FILES = [GAME_FILE].concat(
   fs.readdirSync(SRC_DIR)
-    .filter((f) => /^DoomWad\d+\.jsx$/.test(f))
+    .filter((f) => WAD_RE.test(f))
     .sort((a, b) => parseInt(a.match(/\d+/)[0], 10) - parseInt(b.match(/\d+/)[0], 10)));
 
 for (const f of FILES) {
@@ -37,7 +46,7 @@ for (const f of FILES) {
 
 // 주입이 끝났는지 확인한다. 안 돌린 채로 뽑으면 엔진이 null 인 컴포넌트가
 // 올라가고, 실기에서는 "엔진이 주입되지 않았다"만 보인다.
-const game = fs.readFileSync(path.join(SRC_DIR, "DoomGame.jsx"), "utf8");
+const game = fs.readFileSync(path.join(SRC_DIR, GAME_FILE), "utf8");
 if (game.indexOf("const WASM_GZ_B64 = null") >= 0 || game.indexOf("const createWasiShim = null") >= 0) {
   console.error("주입이 안 됐다. `node tools/build-doom-jsx.cjs` 를 먼저 돌려라.");
   process.exit(1);
@@ -50,7 +59,7 @@ const kb = (b) => (b / 1024).toFixed(0).padStart(6) + " KB";
 let total = 0;
 let rawTotal = 0;
 
-console.log("DOOM  v" + buildNum + (KEEP ? "   (주석 유지 — 대조군)" : ""));
+console.log(NAME + "  v" + buildNum + (KEEP ? "   (주석 유지 — 대조군)" : ""));
 console.log("");
 for (const f of FILES) {
   const src = fs.readFileSync(path.join(SRC_DIR, f), "utf8");
@@ -83,7 +92,7 @@ console.log("  1. 컴포넌트 " + FILES.length + "개를 각각 새로 만든�
 for (const f of FILES) console.log("       " + f.replace(".jsx", ""));
 console.log("     (레지스트리가 평면 전역이라 이름이 겹치면 안 되고,");
 console.log("      하나라도 빠지면 화면이 'wad' 단계에서 멈춘다)");
-console.log("  2. 프리뷰 입력에  <DoomGame />");
+console.log("  2. 프리뷰 입력에  <" + NAME + "Game />");
 console.log("  3. 화면을 클릭해 포커스를 잡는다 — window 가 없어서");
 console.log("     포커스를 잃으면 키가 안 들어온다.");
-console.log("  4. 이동 WASD/방향키 · 사용 Space · 발사 Ctrl · 메뉴 Esc");
+console.log("  4. 이동 WASD/방향키 · 발사 Space · 사용 E · 메뉴 Esc");
