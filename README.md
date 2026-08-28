@@ -4,17 +4,44 @@
 
 [Elyn](https://elyn.app) 은 AI 캐릭터 채팅 서비스인데, 대화 중에 커스텀 React
 컴포넌트를 띄울 수 있다. 그 컴포넌트 하나에 DOOM 을 통째로 집어넣었다 —
-셰어웨어 아홉 판, 원곡, 전체 효과음까지.
+아홉 판, 음악, 전체 효과음, 타이틀 화면과 데모 어트랙트 루프까지.
 
 ```
-<DoomGame />
+<FreedoomGame />
 ```
 
-- **E1M1 ~ E1M9** — 셰어웨어 전편, 타이틀 화면과 데모 어트랙트 루프까지 그대로
+- **E1M1 ~ E1M9** — [Freedoom](https://freedoom.github.io/) Phase 1 의 에피소드 1 전편
 - **소리** — OPL2 FM 합성 음악과 효과음 (원본 사운드블래스터가 내던 그 소리다)
-- **약 2.6 MiB** — 컴포넌트 세 개. 서버도, 외부 요청도, 저장소도 쓰지 않는다
-- **게임 데이터는 이 저장소에 없다** — 빌드할 때 받아온다
-- **Freedoom 판**도 같이 뽑을 수 있다 — 이름이 달라 둘을 함께 등록해 둔다
+- **서버가 없다** — 외부 요청도, 저장소도, 워커도 안 쓴다. 컴포넌트 소스가 전부다
+- **게임 데이터가 저장소에 들어 있다** — Freedoom 은 BSD 라 실어둘 수 있다
+- **셰어웨어 DOOM 판**도 뽑을 수 있다. 이름이 달라 둘을 함께 등록해 둔다
+
+기본은 Freedoom 이다. 셰어웨어 IWAD 는 재배포 조건이 달라 여기 담지 못하고
+빌드할 때 받아와야 하는데, [Freedoom](#freedoom-과-셰어웨어) 은 그럴 필요가 없다.
+
+## 등록
+
+컴포넌트 여섯 개를 Elyn 에 각각 등록한다. 이름은 `FreedoomGame` ·
+`FreedoomWad1`‥`FreedoomWad5` **여야 한다** — 레지스트리가 평면 전역이라
+하나라도 빠지거나 이름이 다르면 화면이 로딩 단계에서 멈춘다.
+
+붙여넣을 소스는 `dist-freedoom/` 에 있다. 그대로 복사해 넣으면 된다.
+
+## 조작
+
+| 키 | |
+|---|---|
+| `←` `→` | 회전 |
+| `↑` `↓` / `W` `S` | 전진·후진 |
+| `A` `D` | 좌우 이동 |
+| `Space` | 발사 |
+| `E` | 문·스위치 |
+| `Shift` | 달리기 |
+| `1`~`7` | 무기 |
+| `Esc` / `Enter` | 메뉴 |
+| `` ` `` | 소리 켜기/끄기 |
+
+화면을 한 번 클릭해야 조작이 시작된다.
 
 ## 어떻게 돌아가나
 
@@ -23,9 +50,8 @@
 브라우저가 `DecompressionStream` 을 갖고 있어서 압축 해제기를 따로 안 실어도 된다.
 
 ```
-DoomGame.jsx    엔진 wasm (230 KB) + WASI shim + Web Audio + React 배선
-DoomWad1.jsx    WAD 조각 1
-DoomWad2.jsx    WAD 조각 2
+FreedoomGame.jsx      엔진 wasm (230 KB) + WASI shim + Web Audio + React 배선
+FreedoomWad1‥5.jsx    WAD 조각 다섯
 ```
 
 WAD 를 쪼개는 건 용량 때문이 아니다. 페이로드는 어차피 합계로 계산된다 —
@@ -61,22 +87,6 @@ WASI 표준 15개와 우리 것 5개(`js_now_ms`, `js_snd_*`)뿐이다.
 Ctrl=발사인데 전진이 `W` 라 "쏘면서 전진"이 **Ctrl+W = 탭 닫기**가 된다.
 Ctrl+W·T·N·R 은 브라우저가 예약한 단축키라 `preventDefault` 로 막을 수 없다.
 
-## 조작
-
-| 키 | |
-|---|---|
-| `←` `→` | 회전 |
-| `↑` `↓` / `W` `S` | 전진·후진 |
-| `A` `D` | 좌우 이동 |
-| `Space` | 발사 |
-| `E` | 문·스위치 |
-| `Shift` | 달리기 |
-| `1`~`7` | 무기 |
-| `Esc` / `Enter` | 메뉴 |
-| `` ` `` | 소리 켜기/끄기 |
-
-화면을 한 번 클릭해야 조작이 시작된다.
-
 ## 빌드
 
 필요한 것: Node 18+, [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34.
@@ -84,87 +94,47 @@ Ctrl+W·T·N·R 은 브라우저가 예약한 단축키라 `preventDefault` 로 
 ```bash
 export WASI_SDK=/path/to/wasi-sdk-34.0          # 기본값: ~/wasi-sdk-34.0-x86_64-windows
 
-node tools/fetch-wad.cjs                        # 셰어웨어 WAD (md5 검증)
+node tools/fetch-wad.cjs --freedoom             # Freedoom Phase 1 (28 MB)
 node tools/build-doom-wasm.cjs                  # → doom/build/doom-Oz.wasm
-node tools/build-wad.cjs doom/vendor/doom1.wad E1M1 doom/build/doom.wad --whole
-node tools/build-doom-jsx.cjs                   # 컴포넌트에 주입
-node tools/doom-selftest.cjs                    # 검증
-node tools/export-doom.cjs                      # → dist-doom/ (CRLF)
-```
-
-`dist-doom/` 의 세 파일을 Elyn 에 각각 등록한다. 이름은 `DoomGame` ·
-`DoomWad1` · `DoomWad2` 여야 한다 — 레지스트리가 평면 전역이라 하나라도 빠지면
-화면이 로딩 단계에서 멈춘다.
-
-## 구조
-
-```
-doom/
-  DoomGame.jsx           컴포넌트. <<...>> 블록은 생성물이다
-  src/
-    doomgeneric_wasm.c     플랫폼 6함수 · 종료 감지
-    w_file_memory.c        WAD 를 메모리에서 읽는다     ← w_file_stdc.c 대체
-    i_sound_wasm.c         사운드, SDL 없이             ← i_sound.c 대체
-    opl_wasm.c             OPL2/3 백엔드                ← opl.c + opl_sdl.c 대체
-    opl_compat.h           chocolate 소스를 doomgeneric 헤더에 맞추는 어댑터
-    wasi-shim.js           WASI preview1 + 인메모리 파일시스템
-    audio.js               Web Audio (효과음 + OPL 음악 스트리밍)
-  devtest/               브라우저에서 재현하기 위한 개발용 페이지
-  vendor/                doomgeneric · chocolate-doom OPL (둘 다 GPL-2.0)
-tools/                   빌드 · 주입 · 검증
-```
-
-**vendor 는 한 줄도 고치지 않는다.** 바꿔야 하는 파일은 *대체*한다 — 빌드에서
-원본을 빼고 우리 것을 넣는 방식이다. 딱 한 곳만 예외인데, `d_main.c` 의 잘못된
-함수 포인터 캐스팅(`(atexit_func_t) G_CheckDemoStatus` — 실제로는 `boolean` 을
-반환한다)은 wasm 에서 간접 호출 시 트랩을 낸다. 그건 컴파일 시 이름 치환으로
-우회한다.
-
-## 검증
-
-```bash
-node tools/doom-selftest.cjs          # 저장소본
-node tools/doom-selftest.cjs --dist   # 업로드본 (주석 제거 후)
-node tools/doom-boot.cjs              # Node WASI 에서 실제로 부팅시킨다
-```
-
-`doom-selftest` 는 **주입된 base64 를 꺼내 실제로 DOOM 을 부팅**시킨다. 데이터가
-원본과 바이트 동일한지, 스프라이트 프레임이 빠지지 않았는지, Elyn 이 막는 API
-이름이 섞이지 않았는지도 본다.
-
-`.jsx` 는 Node 가 파싱하지 못하므로 JSX 구간은 정적 검사만 한다
-(`check-dupe-decl.cjs` · `check-undeclared.cjs`). 브라우저에서만 나는 문제는
-`doom/devtest/` 로 잡는다:
-
-```bash
-node doom/devtest/server.cjs   # http://localhost:8099
-```
-
-## Freedoom 판
-
-에셋을 [Freedoom](https://freedoom.github.io/)(BSD-3-Clause)으로 바꿔 한 벌 더
-만들 수 있다. Elyn 레지스트리가 평면 전역이라 이름이 겹치면 안 되므로
-`FreedoomGame` · `FreedoomWad1‥5` 로 따로 등록한다 — **둘을 같이 올려둘 수 있다.**
-
-```bash
-node tools/fetch-wad.cjs --freedoom
 node tools/build-wad.cjs doom/vendor/freedoom1.wad E1 doom/build/freedoom-e1.wad --sound
 node tools/build-doom-jsx.cjs --name Freedoom --wad doom/build/freedoom-e1.wad --parts 5
 node tools/doom-selftest.cjs  --name Freedoom --wad doom/build/freedoom-e1.wad
-node tools/export-doom.cjs    --name Freedoom          # → dist-freedoom/
+node tools/export-doom.cjs    --name Freedoom   # → dist-freedoom/ (CRLF)
 ```
 
 `DoomGame.jsx` 가 템플릿이고 `FreedoomGame.jsx` 는 거기서 **생성**된다.
-컴포넌트 이름·운반체 개수·배선이 전부 빌드 인자에서 나오므로 손으로 고칠 곳이 없다.
+둘의 차이는 다섯 군데뿐이다 — 함수 이름, 운반체 개수와 배선, 주석 두 줄.
+**엔진 wasm 은 바이트 단위로 같다.** 컴포넌트 이름·운반체 개수·배선이 전부
+빌드 인자에서 나오므로 손으로 고칠 곳이 없다.
 
-### 왜 통째로 못 싣나
+Freedoom 은 셰어웨어가 아니라 **에피소드 1 만 있는 것처럼** 감지된다
+(E2M1 이 없으므로). 메뉴에 에피소드 1 만 나오고, 없는 에피소드를 고를 길이
+없어 그 경로로는 죽지 않는다.
 
-Freedoom Phase 1 은 28 MB 다. gzip 해도 base64 로 15 MB 가 넘어 페이로드에
-안 들어간다. 그래서 **에피소드 1(E1M1‥E1M9)만 뽑는다.** 셰어웨어와 달리
-Freedoom 은 BSD 라 깎아도 되고, 그래서 `build-wad.cjs` 의 프루너가 살아 있다.
+### 셰어웨어 DOOM 판
 
-같은 아홉 판인데 셰어웨어보다 두 배 넘게 든다. Freedoom 쪽 에셋이 더 크다 —
-특히 효과음이 고음질이라 그것만으로 base64 1.2 MB 다.
+에셋을 id Software 의 셰어웨어 IWAD 로 바꿔 한 벌 더 만들 수 있다. 이름이
+달라(`DoomGame` · `DoomWad1`‥`2`) Freedoom 판과 **함께 등록해 둘 수 있다.**
+
+```bash
+node tools/fetch-wad.cjs                        # 셰어웨어 WAD (md5 검증)
+node tools/build-wad.cjs doom/vendor/doom1.wad E1M1 doom/build/doom.wad --whole
+node tools/build-doom-jsx.cjs
+node tools/doom-selftest.cjs
+node tools/export-doom.cjs                      # → dist-doom/ (CRLF)
+```
+
+`--whole` 인 것에 주의. 셰어웨어는 **변형 없이 통째로만** 재배포할 수 있어서
+프루닝하지 않는다 — `build-wad.cjs` 가 셰어웨어 해시를 알아보면 프루닝을
+아예 거부한다. 대신 원본이 작아서 아홉 판을 통째로 싣고도 2.60 MiB 다.
+
+셰어웨어에는 플라스마·BFG·슈퍼샷건 그래픽이 없다. `IDKFA` 로 받아서 그 무기를
+고르면 `R_DrawPSprite` 의 RANGECHECK 에 걸려 죽는다. 치트를 안 쓰면 닿지 않는다.
+
+## 용량
+
+제약은 파일당 상한이 아니라 **리비전 전체 페이로드에 걸리는 타임아웃**이다.
+간헐적으로 524 가 나는데, 1차 대응은 재시도다.
 
 | | WAD base64 | 컴포넌트 합계 |
 |---|---:|---:|
@@ -174,8 +144,15 @@ Freedoom 은 BSD 라 깎아도 되고, 그래서 `build-wad.cjs` 의 프루너�
 | Freedoom E1M1‥E1M5 · 소리 | 4,409 KB | 4.67 MiB |
 | Freedoom E1M1‥E1M3 · 소리 | 4,017 KB | 4.28 MiB |
 
-무결이 확인된 최대는 4.515 MiB 다(2026-08-28). **5.96 MiB 는 그 위이므로
-미지수**고, 이 판은 용량 시험을 겸한다. 실패하면 위 표를 따라 내려가면 된다.
+**무결이 확인된 최대는 4.515 MiB 다(2026-08-28). 5.96 MiB 는 그 위이므로
+미지수다.** 안 올라가면 위 표를 따라 내려가면 된다 — 무음이 가장 크게 줄고
+(`--sound` 를 빼면 된다), 그 다음이 맵을 줄이는 것이다.
+
+Freedoom Phase 1 은 통째로 28 MB 라 gzip 해도 base64 로 15 MB 가 넘는다.
+그래서 **에피소드 1 만 뽑는다.** 셰어웨어와 달리 Freedoom 은 BSD 라 깎아도 되고,
+그래서 `build-wad.cjs` 의 프루너가 살아 있다. 같은 아홉 판인데 셰어웨어보다
+두 배 넘게 드는 건 Freedoom 쪽 에셋이 더 커서다 — 특히 효과음이 고음질이라
+그것만으로 base64 1.2 MB 다.
 
 ### 프루너가 타이틀 화면을 몰랐다
 
@@ -192,11 +169,59 @@ Freedoom 은 BSD 라 깎아도 되고, 그래서 `build-wad.cjs` 의 프루너�
   가만히 있다가 죽는 셈이다. 그래서 **싣는 맵을 가리키는 데모로 바꿔친다**
   (`build-wad.cjs`). 넷 다 E1M6 이 되고 어트랙트 루프는 그대로 돈다.
 
-### 남은 차이
+## 구조
 
-Freedoom 은 셰어웨어가 아니라 **에피소드 1 만 있는 것처럼** 감지된다
-(E2M1 이 없으므로). 메뉴에 에피소드 1 만 나오고, 없는 에피소드를 고를 길이
-없어 그 경로로는 죽지 않는다.
+```
+doom/
+  DoomGame.jsx           컴포넌트 원본. <<...>> 블록은 생성물이고,
+                         FreedoomGame.jsx 는 이걸 템플릿으로 만들어진다
+  src/
+    doomgeneric_wasm.c     플랫폼 6함수 · 종료 감지
+    w_file_memory.c        WAD 를 메모리에서 읽는다     ← w_file_stdc.c 대체
+    i_sound_wasm.c         사운드, SDL 없이             ← i_sound.c 대체
+    opl_wasm.c             OPL2/3 백엔드                ← opl.c + opl_sdl.c 대체
+    opl_compat.h           chocolate 소스를 doomgeneric 헤더에 맞추는 어댑터
+    wasi-shim.js           WASI preview1 + 인메모리 파일시스템
+    audio.js               Web Audio (효과음 + OPL 음악 스트리밍)
+  devtest/               브라우저에서 재현하기 위한 개발용 페이지
+  vendor/                doomgeneric · chocolate-doom OPL (둘 다 GPL-2.0)
+tools/                   빌드 · 주입 · 검증
+dist-freedoom/           붙여넣기용 Freedoom 판 (생성물이지만 커밋한다)
+```
+
+**vendor 는 한 줄도 고치지 않는다.** 바꿔야 하는 파일은 *대체*한다 — 빌드에서
+원본을 빼고 우리 것을 넣는 방식이다. 딱 한 곳만 예외인데, `d_main.c` 의 잘못된
+함수 포인터 캐스팅(`(atexit_func_t) G_CheckDemoStatus` — 실제로는 `boolean` 을
+반환한다)은 wasm 에서 간접 호출 시 트랩을 낸다. 그건 컴파일 시 이름 치환으로
+우회한다.
+
+`doom/` 안의 `FreedoomGame.jsx` · `FreedoomWad*.jsx` · `DoomWad*.jsx` 는
+생성물이라 커밋하지 않는다. `dist-freedoom/` 만 예외로 담는데, 이유는
+[라이선스](#라이선스) 절에 있다.
+
+## 검증
+
+```bash
+node tools/doom-selftest.cjs                              # 저장소본 (셰어웨어)
+node tools/doom-selftest.cjs --dist                       # 업로드본 (주석 제거 후)
+node tools/doom-selftest.cjs --name Freedoom --wad doom/build/freedoom-e1.wad
+node tools/doom-boot.cjs 1200 --wad doom/build/freedoom-e1.wad   # 실제로 부팅시킨다
+```
+
+`doom-selftest` 는 **주입된 base64 를 꺼내 실제로 DOOM 을 부팅**시킨다. 데이터가
+원본과 바이트 동일한지, 스프라이트 프레임이 빠지지 않았는지, Elyn 이 막는 API
+이름이 섞이지 않았는지도 본다.
+
+`doom-boot` 에 틱 수를 넉넉히 주면 타이틀 화면을 지나 어트랙트 루프까지 돈다 —
+위의 데모 버그가 잡히는 곳이 거기다.
+
+`.jsx` 는 Node 가 파싱하지 못하므로 JSX 구간은 정적 검사만 한다
+(`check-dupe-decl.cjs` · `check-undeclared.cjs`). 브라우저에서만 나는 문제는
+`doom/devtest/` 로 잡는다:
+
+```bash
+node doom/devtest/server.cjs   # http://localhost:8099
+```
 
 ## 라이선스
 
@@ -204,20 +229,24 @@ Freedoom 은 셰어웨어가 아니라 **에피소드 1 만 있는 것처럼** �
 과 [chocolate-doom](https://github.com/chocolate-doom/chocolate-doom) 의 파생물이므로
 같은 조건을 따른다.
 
+`dist-freedoom/FreedoomGame.jsx` 에는 컴파일된 엔진이 base64 로 들어 있다.
+**GPL 바이너리 배포**라는 뜻이고, 그래서 대응 소스(`doom/vendor/` · `doom/src/` ·
+`tools/`)가 같은 저장소에 함께 있어야 한다. 지우면 안 된다.
+
+### Freedoom 과 셰어웨어
+
 게임 데이터는 둘의 처지가 달라 다르게 다룬다.
 
+- **Freedoom** 은 BSD-3-Clause 라 깎아도 되고 고쳐도 된다. 위의 프루닝과 데모
+  교체가 허용되는 건 그래서고, 같은 이유로 **`dist-freedoom/` 는 이 저장소에
+  실제로 커밋돼 있다** — gzip+base64 로 실은 프루닝판 게임 데이터라 "바이너리
+  형태 재배포"에 해당하고, BSD 조건(저작권 고지 동봉·이름으로 보증 금지)이
+  걸리는데 [`dist-freedoom/COPYING-FREEDOOM.txt`](dist-freedoom/COPYING-FREEDOOM.txt)
+  가 그 고지를 동봉한다. 원본 `freedoom1.wad`(28 MB, 미가공)는 담지 않고
+  `tools/fetch-wad.cjs --freedoom` 로 받는다.
 - **셰어웨어 IWAD** 는 id Software 의 것이고 **완전하고 변형되지 않은 형태로만**
   재배포할 수 있다. 그래서 이 저장소는 그 판단이 필요 없도록 아예 담지 않고,
   `tools/fetch-wad.cjs` 가 받아와 md5 로 확인한다. `tools/build-wad.cjs` 는
   셰어웨어 해시를 알아보면 프루닝을 **거부한다.** 타이틀 화면의 고지("PROVIDED
   BY id FREE OF CHARGE · SUGGESTED RETAIL PRICE $9.00")가 보이도록 `-warp` 로
   게임에 바로 들어가지도 않는다.
-- **Freedoom** 은 BSD-3-Clause 라 깎아도 되고 고쳐도 된다. 위의 프루닝과 데모
-  교체가 허용되는 건 그래서고, 같은 이유로 **`dist-freedoom/` 는 이 저장소에
-  실제로 커밋돼 있다** — gzip+base64 로 실은 프루닝판 게임 데이터라 "바이너리
-  형태 재배포"에 해당하고, BSD 조건(저작권 고지 동봉·이름으로 보증 금지)이
-  걸리는데 [`dist-freedoom/COPYING-FREEDOOM.txt`](dist-freedoom/COPYING-FREEDOOM.txt)
-  가 그 고지를 동봉한다. 저장소 안이라 다른 파일처럼 LF 로 담겨 있고, Elyn 에
-  붙여넣을 CRLF 판은 `node tools/export-doom.cjs --name Freedoom` 로 따로
-  뽑는다. 원본 `freedoom1.wad`(28 MB, 미가공)는 여전히 담지 않고
-  `tools/fetch-wad.cjs --freedoom` 로 받는다.

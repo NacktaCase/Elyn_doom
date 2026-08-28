@@ -3,8 +3,8 @@
 //   node tools/build-wad.cjs <원본wad> <맵> [출력] [--intermission]
 //   예: node tools/build-wad.cjs doom/vendor/freedoom1.wad E1M1 doom/build/doom.wad
 //
-// 무엇을 남길지는 tools/wad-lib.cjs 가 판정한다 — 보고 도구(wad-deps)와
-// **같은 판단**을 써야 "재 볼 때는 되는데 만들면 죽는" 사태가 안 난다.
+// 무엇을 남길지는 tools/wad-lib.cjs 가 판정한다 — 판단을 여기 섞으면
+// "재 볼 때는 되는데 만들면 죽는" 사본이 또 생긴다.
 //
 // ── TEXTURE1 을 다시 쓴다 ────────────────────────────────────────────
 // 럼프만 골라 담으면 안 된다. TEXTURE1 에 남아 있는 텍스처가 참조하는 patch 가
