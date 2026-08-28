@@ -25,6 +25,14 @@ doom/DoomWad*.jsx
 # doomgeneric 스크린샷 — 소스가 아니다. GPL 이 요구하는 건 소스지 사진이 아니다.
 doom/vendor/doomgeneric-master/screenshots/
 
+# Elyn 환경 조사용 프로브. DOOM 빌드에 필요 없고, 이 저장소의 주제도 아니다.
+# (샌드박스가 뭘 허용하는지 재려고 만든 별개 물건이다.)
+doom/SandboxProbe.jsx
+tools/export-probe.cjs
+tools/make-probe-fixture.cjs
+tools/probe-selftest.cjs
+tools/make-payload-probe.cjs
+
 # ── tools/ 안에서 빼는 것 ────────────────────────────────────────────
 # chess3d 전용 도구들. strip-comments.cjs 는 export-doom 이 쓰므로 남긴다.
 tools/baseline/
