@@ -3,9 +3,11 @@
 /*
 
 !/.gitattributes
+!/.github/
 !/.gitignore
 !/LICENSE
 !/README.md
+!/package.json
 !/docs/
 !/doom/
 !/tools/

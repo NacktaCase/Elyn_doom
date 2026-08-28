@@ -46,6 +46,20 @@ node tools/export-doom.cjs                      # → dist-doom/ (CRLF)
 
 ## 검증
 
+### 아무것도 없이 (CI 가 도는 것)
+
+```bash
+npm test                                        # = node tools/doom-smoke.cjs
+node tools/doom-smoke.cjs --ticks 1200          # 어트랙트 루프까지
+```
+
+`doom-smoke` 는 커밋된 `dist-freedoom/` 에서 엔진과 WAD 를 꺼내 그대로
+부팅시킨다. wasi-sdk 도 28 MB 다운로드도 필요 없어 **갓 클론한 상태에서
+도는 유일한 검증**이고, 그래서 CI 가 이걸 돌린다. 대신 주입된 데이터가
+원본과 같은지는 **대조하지 않는다** — 그건 아래 selftest 의 몫이다.
+
+### 빌드 산출물과 대조 (올리기 전에)
+
 ```bash
 node tools/doom-selftest.cjs                              # 저장소본 (셰어웨어)
 node tools/doom-selftest.cjs --dist                       # 업로드본 (주석 제거 후)

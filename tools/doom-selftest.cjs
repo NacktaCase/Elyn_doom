@@ -13,7 +13,7 @@
 // 하마터면 샌드박스를 의심할 뻔했다. 같은 종류의 사고를 여기서 막는다.
 //
 // ── 한계 ─────────────────────────────────────────────────────────────
-// `.jsx` 는 Node 가 파싱을 못 한다(engine-selftest F절과 같은 한계).
+// `.jsx` 는 Node 가 파싱을 못 한다.
 // <<RENDER>> 아래의 React 배선과 JSX 는 정적 검사만 한다.
 const fs = require("fs");
 const path = require("path");
@@ -26,7 +26,7 @@ const { createDoomAudio } = require("../doom/src/audio.js");
 
 const ROOT = path.join(__dirname, "..");
 // --dist 로 업로드본(dist-doom/)을 검사한다. 주석 제거는 **변환**이므로
-// 검증 밖에 두면 안 된다 — chess3d 자체검증 S절과 같은 이유다.
+// 검증 밖에 두면 안 된다.
 // (예전에는 dist 가 저장소본과 줄바꿈 빼고 바이트 동일해서 그 등식이
 //  성립했지만, 주석을 벗기면서 깨졌다.)
 const DIST = process.argv.includes("--dist");

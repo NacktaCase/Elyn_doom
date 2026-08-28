@@ -53,6 +53,18 @@ FreedoomWad1‥5.jsx    WAD 조각 다섯
 Emscripten 을 쓰지 않는 이유, 샌드박스가 실제로 걸어둔 제약, WAD 를 다섯으로
 쪼개는 이유는 [docs/design.md](docs/design.md) 에 있다.
 
+## 확인
+
+클론한 그대로 **의존성 없이** 도는 검사가 하나 있다. `dist-freedoom/` 에서
+엔진과 WAD 를 꺼내 실제로 부팅시킨다 — 붙여넣는 사람이 받는 것과 같은 파일이다.
+
+```bash
+npm test
+```
+
+CI 가 매 푸시마다 이걸 돌린다. 빌드 산출물과 대조하는 전체 검증은
+[docs/build.md](docs/build.md#검증) 에 있다.
+
 ## 빌드
 
 필요한 것: Node 18+, [wasi-sdk](https://github.com/WebAssembly/wasi-sdk) 34.

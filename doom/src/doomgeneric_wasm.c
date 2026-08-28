@@ -3,12 +3,12 @@
 // doomgeneric 이 요구하는 함수는 6개뿐이다(doomgeneric.h). 나머지는 전부
 // 바닐라 DOOM 코드 그대로다 — vendor/ 는 한 줄도 고치지 않는다.
 //
-// ── 설계 방침: chess3d/engine-rs 와 같다 ─────────────────────────────
+// ── 설계 방침 ───────────────────────────────────────────────────────
 // wasm-bindgen 도 Emscripten 도 쓰지 않는다. 이유가 둘인데, 두 번째가
 // 이 프로젝트에 고유하다:
 //
 //   1. Elyn 컴포넌트는 function 하나 안에 다 들어가야 해서 glue 모듈을
-//      import 할 수 없다 (ChessEngine.jsx 가 같은 이유로 날것 export 를 쓴다).
+//      import 할 수 없다.
 //   2. **Elyn 은 컴포넌트 소스를 정적 스캔해 등록을 막는다.** 정찰본 v1.0 이
 //      실제로 그렇게 거부됐다. Emscripten glue 에는 네트워크·URL·파일 계열
 //      이름이 수십 개 박혀 있어 그대로는 등록조차 안 될 공산이 크다.
@@ -22,8 +22,8 @@
 //   JS → wasm :  doom_init / doom_tick / doom_key / doom_frame_ptr ...
 //   wasm → JS :  js_now_ms()  하나뿐이다.
 //
-// import 가 하나라는 게 중요하다. ChessEngine 의 should_stop 과 같은 모양이고,
-// import 표면이 좁을수록 브라우저 쪽 shim 이 작아진다.
+// import 가 하나라는 게 중요하다. import 표면이 좁을수록 브라우저 쪽 shim 이
+// 작아지고, 정적 스캐너에 걸릴 이름도 그만큼 안 생긴다.
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -35,8 +35,8 @@
 
 // ── JS 가 제공하는 시계 ──────────────────────────────────────────────
 // WASI 의 clock_time_get 을 쓸 수도 있지만 JS 에서 직접 받는다.
-// ChessEngine 이 시계를 능력 탐지해 넘겨주는 것과 같은 방침 — 시간의 출처를
-// **하나로** 두어야 나중에 "게임 시간이 어긋난다" 류의 사고가 안 난다.
+// 시간의 출처를 **하나로** 두어야 나중에 "게임 시간이 어긋난다" 류의 사고가
+// 안 난다. JS 쪽에서 능력 탐지해 넘겨준다.
 __attribute__((import_module("env"), import_name("js_now_ms")))
 extern uint32_t js_now_ms(void);
 

@@ -25,4 +25,6 @@ http.createServer((req, res) => {
   if (!file || !fs.existsSync(file)) { res.writeHead(404); res.end("no"); return; }
   res.writeHead(200, { "Content-Type": TYPES[path.extname(file)] || "text/plain" });
   fs.createReadStream(file).pipe(res);
-}).listen(8099, () => console.log("http://localhost:8099"));
+// 루프백에만 붙인다. 개발용이라 같은 기계에서만 열면 되고, 기본값(모든
+// 인터페이스)으로 두면 공용 네트워크에서 남의 브라우저에도 열린다.
+}).listen(8099, "127.0.0.1", () => console.log("http://localhost:8099"));

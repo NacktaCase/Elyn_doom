@@ -24,7 +24,7 @@ function DoomGame(props) {
   // 엔진은 doomgeneric(= chocolate-doom 이식)을 wasi-sdk clang 으로 wasm32 로
   // 빌드한 것이다. Emscripten 을 안 쓴다. 이유가 둘인데 두 번째가 결정적이다:
   //   1. Elyn 컴포넌트는 function 하나에 다 들어가야 해서 glue 모듈을 import
-  //      할 수 없다 (ChessEngine.jsx 가 같은 이유로 날것 export 를 쓴다).
+  //      할 수 없다.
   //   2. **Elyn 은 소스를 정적 스캔해 등록을 막는다.** 정찰본 v1.0 이 실제로
   //      거부됐다. Emscripten glue 에는 네트워크·URL·파일 계열 이름이 수십 개
   //      박혀 있어 그대로는 등록조차 안 될 공산이 크다. glue 가 없으면 걸릴
@@ -40,7 +40,7 @@ function DoomGame(props) {
   // 터지면서 **붙여넣은 것과 저장된 것이 달라진다.** ChessPieces.jsx 가
   // 693 KB 로 도는 것은 확인됐으므로 그 근처로 끊는다.
   //
-  // ── 실측으로 정해진 것들 (SandboxProbe v1.1) ───────────────
+  // ── 실측으로 정해진 것들 ───────────────────────────────────
   //   · 키는 React 합성 이벤트로만 온다. window 가 없다.
   //     → **캔버스가 포커스를 쥔 동안만** 조작된다. 그래서 "클릭해서 시작"이다.
   //   · e.code 가 165/165 로 전부 온다 → 스캔코드 기반이라 한글 입력
@@ -531,10 +531,10 @@ function DoomGame(props) {
   // <</WASM-DATA>>
 
   // ───────────────────────────────────────────────────────────
-  // 1. 유틸 — ChessEngine.jsx 에서 검증된 것을 그대로 가져온다.
+  // 1. 유틸
   // ───────────────────────────────────────────────────────────
 
-  // ChessEngine.jsx:1560 그대로. atob 능력 탐지 + 수동 폴백.
+  // atob 능력 탐지 + 수동 폴백.
   const b64Bytes = (str) => {
     if (typeof atob === 'function') {
       const bin = atob(str);
@@ -1106,7 +1106,7 @@ function DoomGame(props) {
   // <<RENDER>>
   // ───────────────────────────────────────────────────────────
   // 3. React 배선
-  //    ⚠ chess3d 의 실기 버그 넷이 전부 이런 자리에서 났다 — React 배선,
+  //    ⚠ 이 샌드박스에서 겪은 실기 버그는 전부 이런 자리에서 났다 — React 배선,
   //      마운트 수명, 업로드, wasm 래퍼. 비동기는 전부 alive 가드를 건다.
   // ───────────────────────────────────────────────────────────
   const canvasRef = useRef(null);

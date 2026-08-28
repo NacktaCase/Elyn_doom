@@ -1,0 +1,27 @@
+{
+  "name": "elyn-doom",
+  "version": "1.0.0",
+  "description": "DOOM running inside a single Elyn chat component",
+  "license": "GPL-2.0-only",
+  "private": true,
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NacktaCase/Elyn_doom.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "test": "node tools/doom-smoke.cjs",
+    "smoke": "node tools/doom-smoke.cjs",
+    "selftest": "node tools/doom-selftest.cjs",
+    "boot": "node tools/doom-boot.cjs",
+    "devtest": "node doom/devtest/server.cjs",
+    "fetch:freedoom": "node tools/fetch-wad.cjs --freedoom",
+    "fetch:shareware": "node tools/fetch-wad.cjs",
+    "build:wasm": "node tools/build-doom-wasm.cjs",
+    "build:jsx": "node tools/build-doom-jsx.cjs",
+    "build:wad": "node tools/build-wad.cjs",
+    "export": "node tools/export-doom.cjs"
+  }
+}

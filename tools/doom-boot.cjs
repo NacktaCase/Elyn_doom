@@ -1,6 +1,6 @@
 // doom.wasm 을 Node 에서 실제로 부팅시켜 프레임이 나오는지 본다.
 //
-//   node tools/doom-boot.cjs [틱수]
+//   node tools/doom-boot.cjs [틱수] [--wasm 경로] [--wad 경로]
 //
 // ── 왜 브라우저 전에 Node 인가 ───────────────────────────────────────
 // 여기까지는 전부 계산이었다. WAD 를 5.5% 로 깎았지만 **텍스처 하나만 빠져도
@@ -9,7 +9,6 @@
 //
 // Node 에는 WASI 가 내장이라 같은 wasm 을 그대로 돌릴 수 있고, DOOM 의 printf
 // 가 stdout 으로 나온다. **에러 메시지를 읽을 수 있는 유일한 기회다.**
-// (engine-selftest 가 컴포넌트를 Node 에서 그대로 돌리는 것과 같은 방침이다.)
 const fs = require("fs");
 const path = require("path");
 // ⚠ node:wasi 를 쓰지 않는다. 브라우저에는 없으므로 그걸로 통과시키면
@@ -20,10 +19,14 @@ const { createWasiShim } = require("../doom/src/wasi-shim.js");
 const { createDoomAudio } = require("../doom/src/audio.js");
 
 const ROOT = path.join(__dirname, "..");
-const WASM = path.join(ROOT, "doom", "build", "doom-Oz.wasm");
-const wi = process.argv.indexOf("--wad");
-const WAD = wi >= 0 ? path.resolve(ROOT, process.argv[wi + 1])
-                    : path.join(ROOT, "doom", "build", "doom.wad");
+const argOf = (flag, dflt) => {
+  const i = process.argv.indexOf(flag);
+  return i >= 0 ? path.resolve(ROOT, process.argv[i + 1]) : dflt;
+};
+// --wasm 은 doom-smoke.cjs 가 쓴다. 배포본에서 뽑아낸 엔진을 빌드 산출물
+// 없이 그대로 부팅시키려면 경로를 밖에서 줄 수 있어야 한다.
+const WASM = argOf("--wasm", path.join(ROOT, "doom", "build", "doom-Oz.wasm"));
+const WAD = argOf("--wad", path.join(ROOT, "doom", "build", "doom.wad"));
 const TICKS = parseInt(process.argv[2], 10) || 60;
 
 for (const f of [WASM, WAD]) {
@@ -60,7 +63,6 @@ WebAssembly.instantiate(bytes, {
 
   // ⚠ memory.buffer 는 grow 하면 **갈아치워진다.** 뷰를 미리 잡아두고
   //   재사용하면 detached ArrayBuffer 를 읽게 된다. 매번 새로 잡는다.
-  //   (ChessEngine 의 wasm 래퍼가 res() 를 매번 만드는 것과 같은 이유다.)
   const u8 = () => new Uint8Array(x.memory.buffer);
 
   console.log("WAD 적재 " + (wadBytes.length / 1024).toFixed(0) + " KB");
@@ -123,7 +125,10 @@ WebAssembly.instantiate(bytes, {
     console.log("✓ DOOM 이 돌고 화면이 그려진다.");
 
     // 눈으로 확인할 수 있게 PPM 으로 떨군다. 포맷이 단순해서 의존성이 없다.
+    // 갓 클론한 저장소에는 doom/build/ 가 없다(생성물이라 커밋 안 한다).
+    // 배포본만으로 도는 doom-smoke.cjs 가 그 상태로 들어오므로 만들어 둔다.
     const out = path.join(ROOT, "doom", "build", "frame.ppm");
+    fs.mkdirSync(path.dirname(out), { recursive: true });
     const head = Buffer.from("P6\n" + W + " " + H + "\n255\n", "ascii");
     const rgb = Buffer.alloc(W * H * 3);
     for (let i = 0; i < W * H; i++) {

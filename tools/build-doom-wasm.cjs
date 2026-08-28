@@ -5,7 +5,7 @@
 // ── 왜 Emscripten 이 아닌가 ──────────────────────────────────────────
 // 이유가 둘이고 두 번째가 결정적이다:
 //   1. Elyn 컴포넌트는 function 하나에 다 들어가야 해서 glue 모듈을 import
-//      할 수 없다 (ChessEngine.jsx 가 같은 이유로 날것 export 를 쓴다).
+//      할 수 없다.
 //   2. **Elyn 은 소스를 정적 스캔해 등록을 막는다.** Emscripten glue 에는
 //      네트워크·URL·파일 계열 이름이 수십 개 박혀 있어 그대로는 등록조차
 //      안 될 공산이 크다. glue 가 없으면 걸릴 이름이 애초에 안 생긴다.
@@ -36,8 +36,10 @@ if (!fs.existsSync(CLANG)) {
   process.exit(1);
 }
 
-// -Oz 가 기본이다. -O2 는 736 KB, -Oz 는 378 KB 인데 DOOM 은 1993년 게임이라
-// 브라우저에서 속도가 남아돈다(실측 63 tic/s, 필요한 건 35).
+// -Oz 가 기본이다. -O2 는 735 KB, -Oz 는 422 KB 인데 DOOM 은 1993년 게임이라
+// 속도가 남아돈다 — 쉬지 않고 돌려 14.3ms/틱(≈70 tic/s)이고 필요한 건 35 다.
+// 35Hz 로 맞춰 부르면 틱당 0.39ms 로 떨어진다(doom-bench.cjs, 2026-08-28).
+// 페이로드가 리비전 전체에 걸리므로 313 KB 차이는 그냥 못 낸다.
 const OPT = process.argv.includes("--O2") ? "-O2" : "-Oz";
 
 // vendor 에서 가져올 것. Makefile.emscripten 의 목록에서 SDL·플랫폼 종속을
