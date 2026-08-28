@@ -1,41 +1,43 @@
-# 이 폴더에는 서로 무관한 프로젝트가 여럿 있다(chess3d · 3D 모델 뷰어 · DOOM).
-# 저장소는 **DOOM 만** 담는다. 그래서 전부 무시하고 필요한 것만 되살린다.
-# (반대로 하면 언젠가 chess3d 가 실수로 딸려 올라간다.)
+# 작업 폴더에는 이 저장소와 무관한 것들이 함께 있다. 그래서 전부 무시하고
+# 필요한 것만 되살린다. (반대로 하면 언젠가 무관한 게 실수로 딸려 올라간다.)
 /*
 
+!/.gitattributes
 !/.gitignore
 !/LICENSE
 !/README.md
+!/docs/
 !/doom/
 !/tools/
 !/dist-freedoom/
 
-# ── doom/ 안에서 빼는 것 ─────────────────────────────────────────────
+# ── doom/ ────────────────────────────────────────────────────────────
 # 빌드 산출물. .o · wasm · 잘라낸 WAD · 디버그 프레임.
 doom/build/
 
-# WAD 는 커밋하지 않는다. `node tools/fetch-wad.cjs` 가 받아오고 md5 로
-# 정본인지 확인한다. 셰어웨어는 변형 없이 재배포할 수 있지만, 받아오면
-# 그 판단 자체가 필요 없고 저장소도 30 MB 가벼워진다.
+# WAD 는 커밋하지 않는다. `node tools/fetch-wad.cjs` 가 받아와 md5 로 정본인지
+# 확인한다. 저장소가 30 MB 가벼워지고, 셰어웨어 재배포 판단도 필요 없어진다.
 doom/vendor/*.wad
 
-# DoomWad1/2.jsx 는 WAD 를 base64 로 품은 **생성물**이다(각 1.2 MB).
-# `node tools/build-doom-jsx.cjs` 가 만든다.
-doom/DoomWad*.jsx
-
-# doomgeneric 스크린샷 — 소스가 아니다. GPL 이 요구하는 건 소스지 사진이 아니다.
+# 스크린샷 — 소스가 아니다. GPL 이 요구하는 건 소스지 사진이 아니다.
 doom/vendor/doomgeneric-master/screenshots/
 
-# Elyn 환경 조사용 프로브. DOOM 빌드에 필요 없고, 이 저장소의 주제도 아니다.
-# (샌드박스가 뭘 허용하는지 재려고 만든 별개 물건이다.)
+# 컴포넌트 생성물. build-doom-jsx.cjs 가 만든다 (운반체는 각 1.2 MB).
+doom/DoomWad*.jsx
+doom/FreedoomGame.jsx
+doom/FreedoomWad*.jsx
+
+# 이 저장소의 주제가 아닌 것. Elyn 샌드박스가 뭘 허용하는지 재려고 만든
+# 별개 물건이라 DOOM 빌드에 필요 없다.
 doom/SandboxProbe.jsx
 tools/export-probe.cjs
 tools/make-probe-fixture.cjs
-tools/probe-selftest.cjs
 tools/make-payload-probe.cjs
+tools/probe-selftest.cjs
 
-# ── tools/ 안에서 빼는 것 ────────────────────────────────────────────
-# chess3d 전용 도구들. strip-comments.cjs 는 export-doom 이 쓰므로 남긴다.
+# ── tools/ ───────────────────────────────────────────────────────────
+# 같은 폴더에 있을 뿐 DOOM 과 무관한 도구들.
+# strip-comments.cjs 는 export-doom.cjs 가 쓰므로 남긴다.
 tools/baseline/
 tools/build-engine-wasm.cjs
 tools/build-opening-book.cjs
@@ -51,20 +53,7 @@ tools/verify-pieces.cjs
 
 # ── 배포본 ───────────────────────────────────────────────────────────
 # export-doom.cjs 가 만드는 붙여넣기용 사본. 생성물이라 커밋하지 않는다.
+# dist-freedoom/ 만 예외로 담는다 — 이유는 docs/licensing.md 에 있다.
 /dist-doom/
 /dist-probe/
 /dist-payload/
-
-# ── Freedoom 변종 ────────────────────────────────────────────────────
-# FreedoomGame.jsx 는 DoomGame.jsx 를 템플릿으로 **생성**된다:
-#   node tools/build-doom-jsx.cjs --name Freedoom --wad ... --parts 5
-# 운반체와 마찬가지로 생성물이라 doom/ 안의 것은 커밋하지 않는다.
-doom/FreedoomGame.jsx
-doom/FreedoomWad*.jsx
-
-# dist-freedoom/ 은 예외다 — **여기만 커밋한다.** Freedoom 은 BSD-3-Clause 라
-# 프루닝·수정판을 재배포해도 되고(COPYING-FREEDOOM.txt 가 그 조건을 동봉한다),
-# 소스가 저장소에 있어야 doom/vendor/freedoom1.wad 를 새로 받지 않고도
-# 결과물을 볼 수 있다. 저장소는 다른 파일처럼 LF 로 담기므로(.gitattributes),
-# Elyn 에 붙여넣을 CRLF 판은 여전히 `node tools/export-doom.cjs --name Freedoom`
-# 로 따로 뽑는다. 다른 dist-* 는 여전히 순수 생성물이라 뺀다.

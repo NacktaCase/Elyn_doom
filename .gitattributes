@@ -1,0 +1,12 @@
+# 저장소는 LF 로 둔다.
+#
+# Elyn 에디터는 LF 만 있는 큰 파일을 제대로 못 받으므로 업로드본은 CRLF 로
+# 뽑지만(tools/export-doom.cjs), **그건 뽑을 때 하는 변환이지 저장 형식이
+# 아니다.** 저장소까지 CRLF 가 되면 검증 도구들이 어긋난다.
+* text=auto eol=lf
+
+# 바이너리로 다뤄야 하는 것들 (혹시 커밋되더라도 변환되지 않게)
+*.wad binary
+*.wasm binary
+*.png binary
+*.ppm binary
